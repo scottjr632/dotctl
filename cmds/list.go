@@ -10,6 +10,7 @@ var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all tracked files in the dotfiles repository",
 	Long:  `List all tracked files in the dotfiles repository`,
+	Aliases: []string{"ls"},
 	Run: func(cmd *cobra.Command, args []string) {
 		cfgResult := config.Get()
 		if cfgResult.IsErr() {

@@ -11,6 +11,7 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show the status of the dotfiles repository",
 	Long:  `Show the status of the dotfiles repository`,
+	Aliases: []string{"st"},
 	Run: func(cmd *cobra.Command, args []string) {
 		cfgResult := config.Get()
 		if cfgResult.IsErr() {
