@@ -148,3 +148,37 @@ func GetRemoteURL(cfg config.Config) result.Result[string] {
 	}
 	return result.Ok(strings.TrimSpace(string(output)))
 }
+
+func CheckForSync(cfg config.Config) result.Result[string] {
+	// Fetch the latest changes from the remote repository
+	fetchCmd := GitCmd(cfg, "fetch")
+	if _, err := fetchCmd.SilentlyExecute(); err != nil {
+		return result.Err[string](err)
+	}
+
+	// Check for differences between local and remote branches
+	statusCmd := GitCmd(cfg, "status", "-uno")
+	output, err := statusCmd.SilentlyExecute()
+	if err != nil {
+		return result.Err[string](err)
+	}
+
+	// Check for staged and modified files
+	diffCmd := GitCmd(cfg, "diff", "--name-only", "--cached")
+	diffOutput, err := diffCmd.SilentlyExecute()
+	if err != nil {
+		return result.Err[string](err)
+	}
+
+	if diffOutput != "" {
+		return result.Ok("There are staged and modified files that need to be committed.")
+	} else if strings.Contains(output, "Your branch is ahead of") {
+		return result.Ok("Local changes need to be pushed to the remote repository.")
+	} else if strings.Contains(output, "Your branch is behind") {
+		return result.Ok("Remote changes need to be pulled to the local repository.")
+	} else if strings.Contains(output, "have diverged") {
+		return result.Ok("Local and remote changes have diverged and need to be reconciled.")
+	} else {
+		return result.Ok("")
+	}
+}
