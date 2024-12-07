@@ -22,6 +22,10 @@ func (f Failable) Err() error {
 	return f.err
 }
 
+func (f Failable) UnwrapErr() error {
+	return f.err
+}
+
 // Must unraps the result and panics if there is an error
 // can be caughts with a defer result.Recover(&err)
 func (f Failable) Must() {
