@@ -139,3 +139,12 @@ func ResetAllStagedFiles(cfg config.Config) result.Failable {
 	cmd := GitCmd(cfg, "reset")
 	return result.NewFailable(cmd.ExecuteInTerminal())
 }
+
+func GetRemoteURL(cfg config.Config) result.Result[string] {
+	cmd := GitCmd(cfg, "remote", "get-url", "origin")
+	output, err := cmd.SilentlyExecute()
+	if err != nil {
+		return result.Err[string](err)
+	}
+	return result.Ok(strings.TrimSpace(string(output)))
+}
