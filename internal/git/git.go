@@ -88,6 +88,11 @@ func AddFile(cfg config.Config, filePath string) result.Failable {
 	return result.NewFailable(cmd.ExecuteInTerminal())
 }
 
+func StageAllFiles(cfg config.Config) result.Failable {
+	cmd := GitCmd(cfg, "add", "--all")
+	return result.NewFailable(cmd.ExecuteInTerminal())
+}
+
 func Push(cfg config.Config) result.Failable {
 	cmd := GitCmd(cfg, "push")
 	return result.NewFailable(cmd.ExecuteInTerminal())

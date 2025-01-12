@@ -8,10 +8,11 @@ import (
 )
 
 var trackCmd = &cobra.Command{
-	Use:   "track [file]",
-	Short: "Track a file with the dotfiles repository",
-	Long:  `Track a file with the dotfiles repository`,
-	Args:  cobra.ExactArgs(1),
+	Use:     "track [file]",
+	Short:   "Track a file with the dotfiles repository",
+	Long:    `Track a file with the dotfiles repository`,
+	Aliases: []string{"t", "add", "a"},
+	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		filePath := args[0]
 
@@ -21,7 +22,7 @@ var trackCmd = &cobra.Command{
 			return
 		}
 
-		cfg := cfgResult.Must()
+		cfg := cfgResult.Value()
 
 		addResult := git.AddFile(cfg, filePath)
 		if addResult.IsErr() {

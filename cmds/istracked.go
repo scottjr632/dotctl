@@ -8,7 +8,13 @@ import (
 )
 
 var isTrackedCmd = &cobra.Command{
-	Use:   "is-tracked [file]",
+	Use: "is-tracked [file]",
+	Aliases: []string{
+		"istracked",
+		"is",
+		"tracked",
+		"it",
+	},
 	Short: "Check if a file is tracked in the dotfiles repository",
 	Long:  `Check if a file is tracked in the dotfiles repository`,
 	Args:  cobra.ExactArgs(1),

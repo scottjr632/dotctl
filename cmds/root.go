@@ -1,6 +1,8 @@
 package cmds
 
 import (
+	"fmt"
+
 	"github.com/fatih/color"
 	"github.com/scottjr632/dotctl/internal/config"
 	"github.com/scottjr632/dotctl/internal/git"
@@ -23,6 +25,12 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println(r)
+		}
+	}()
+
 	if err := rootCmd.Execute(); err != nil {
 		panic(err)
 	}
