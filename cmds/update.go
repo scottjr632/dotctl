@@ -6,6 +6,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var updatePatch bool
+
 var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update and commit all tracked files that have changes",
@@ -18,11 +20,20 @@ var updateCmd = &cobra.Command{
 		}
 
 		cfg := cfgResult.Must()
-		addCmd := git.GitCmd(cfg, "add", "-u")
-		err := addCmd.ExecuteInTerminal()
-		if err != nil {
-			errorPrinter.Println(err)
-			return
+		if updatePatch {
+			patchCmd := git.GitCmd(cfg, "add", "-p")
+			err := patchCmd.ExecuteInTerminal()
+			if err != nil {
+				errorPrinter.Println(err)
+				return
+			}
+		} else {
+			addCmd := git.GitCmd(cfg, "add", "-u")
+			err := addCmd.ExecuteInTerminal()
+			if err != nil {
+				errorPrinter.Println(err)
+				return
+			}
 		}
 
 		result := git.CommitStagedFiles(cfg)
@@ -34,5 +45,7 @@ var updateCmd = &cobra.Command{
 }
 
 func init() {
+	updateCmd.Flags().BoolVarP(&updatePatch, "patch", "p", false, "Use patch to track changes")
+
 	rootCmd.AddCommand(updateCmd)
 }
