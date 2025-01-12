@@ -11,9 +11,10 @@ import (
 )
 
 var ghCmd = &cobra.Command{
-	Use:   "gh",
-	Short: "Open the git repository on GitHub",
-	Long:  `Open the git repository on GitHub in the default web browser`,
+	Use:     "gh",
+	Short:   "Open the git repository on GitHub",
+	Long:    `Open the git repository on GitHub in the default web browser`,
+	Aliases: []string{"view", "open"},
 	Run: func(cmd *cobra.Command, args []string) {
 		cfgResult := config.Get()
 		if cfgResult.IsErr() {
