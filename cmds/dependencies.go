@@ -20,6 +20,7 @@ var dependenciesCmd = &cobra.Command{
 	Aliases: []string{
 		"deps",
 		"dep",
+		"dp",
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Get().Must()
