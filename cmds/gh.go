@@ -10,11 +10,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var ghCmd = &cobra.Command{
-	Use:     "gh",
+var viewCmd = &cobra.Command{
+	Use:     "view",
 	Short:   "Open the git repository on GitHub",
 	Long:    `Open the git repository on GitHub in the default web browser`,
-	Aliases: []string{"view", "open"},
+	Aliases: []string{"gh", "open"},
 	Run: func(cmd *cobra.Command, args []string) {
 		cfgResult := config.Get()
 		if cfgResult.IsErr() {
@@ -52,5 +52,5 @@ var ghCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(ghCmd)
+	rootCmd.AddCommand(viewCmd)
 }
