@@ -1,0 +1,25 @@
+<task>
+User: hello
+
+Assistant: Hello! What can I help you with today?
+
+User: tell me about this repo
+
+Assistant: **dotctl** — a Go CLI you wrote for managing dotfiles via a bare Git repo whose work tree is your home directory. ~3.5k lines, on `main`, clean tree.
+
+**Architecture**
+- `main.go` → `cmds.Execute()` (Cobra)
+- `cmds/` — one file per command: `init`, `checkout`, `track`, `update`, `status`, `list`, `is-tracked`, `pull`, `push`, `commit`, `branch`, `log`, `git` (passthrough), `doctor`, `config`, `profile`, `dependencies`, `agent`, plus `output.go` for the JSON contract
+- `internal/` — `config` (defaults: config in `~/.config/dotctl/config`, bare repo in `~/.cfg/.dotfiles`), `git` wrapper, `runnables` (executable dependency scripts), `agentskill` (embedded Agent Skills SKILL.md), `terminalcmd`, plus small `result`/`promise`/`utils` helpers
+- Deps: cobra, promptui, fatih/color. Go 1.21.5. Task runner via `Taskfile.yml` (`task check` = gofmt/vet/test/build), CI in `.github/`
+
+**What makes it distinctive**
+1. **Agent-friendly by design** — a global `--json` contract emitting exactly one document per invocation (`kind: result|plan|error`) with stable error codes (`CONFIG_NOT_FOUND`, `DOCTOR_UNHEALTHY`, etc.), plus `--dry-run`, `--non-interactive`, `--yes`, and `--config-dir`/`--work-tree` overrides for sandboxed operation.
+2. **Installable agent skill** — `dotctl agent install-skill` writes `~/.agents/skills/dotctl/SKILL.md` so harnesses can discover it.
+3. **Safe first checkout** — `checkout --backup-existing` moves conflicting files to a timestamped backup dir, deliberately restricted to the initial checkout.
+4. **Runnables** — `dotctl dependencies` manages/executes local setup scripts (brew, etc.).
+
+Test coverage exists for checkout, doctor, gh, the JSON contract, config, git, runnables, and utils. Recent commits are mostly about hardening for non-interactive/agent use.
+
+Anything specific you want to dig into or change?
+</task>
