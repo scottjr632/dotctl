@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/scottjr632/dotctl/internal/config"
-	"github.com/scottjr632/dotctl/internal/result"
-	"github.com/scottjr632/dotctl/internal/terminalcmd"
-	"github.com/scottjr632/dotctl/internal/utils"
+	"github.com/srctl/dotctl/internal/config"
+	"github.com/srctl/dotctl/internal/result"
+	"github.com/srctl/dotctl/internal/terminalcmd"
+	"github.com/srctl/dotctl/internal/utils"
 )
 
 type NonEmptyDirError struct {

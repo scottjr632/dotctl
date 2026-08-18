@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/scottjr632/dotctl/internal/agentskill"
 	"github.com/spf13/cobra"
+	"github.com/srctl/dotctl/internal/agentskill"
 )
 
 var (

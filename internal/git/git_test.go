@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/scottjr632/dotctl/internal/config"
-	"github.com/scottjr632/dotctl/internal/terminalcmd"
+	"github.com/srctl/dotctl/internal/config"
+	"github.com/srctl/dotctl/internal/terminalcmd"
 )
 
 func TestRepositoryInspection(t *testing.T) {

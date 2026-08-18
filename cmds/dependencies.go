@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/manifoldco/promptui"
-	"github.com/scottjr632/dotctl/internal/config"
-	"github.com/scottjr632/dotctl/internal/runnables"
-	"github.com/scottjr632/dotctl/internal/utils"
 	"github.com/spf13/cobra"
+	"github.com/srctl/dotctl/internal/config"
+	"github.com/srctl/dotctl/internal/runnables"
+	"github.com/srctl/dotctl/internal/utils"
 )
 
 var (

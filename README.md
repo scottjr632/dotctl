@@ -7,7 +7,7 @@
 ## Installation
 
 ```bash
-go install github.com/scottjr632/dotctl@latest
+go install github.com/srctl/dotctl@latest
 ```
 
 From a source checkout, build and install it into `~/.local/bin`:

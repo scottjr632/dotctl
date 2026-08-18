@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/scottjr632/dotctl/internal/config"
 	"github.com/spf13/cobra"
+	"github.com/srctl/dotctl/internal/config"
 )
 
 var configCmd = &cobra.Command{

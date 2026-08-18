@@ -9,9 +9,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/scottjr632/dotctl/internal/config"
-	"github.com/scottjr632/dotctl/internal/terminalcmd"
 	"github.com/spf13/cobra"
+	"github.com/srctl/dotctl/internal/config"
+	"github.com/srctl/dotctl/internal/terminalcmd"
 )
 
 type response struct {

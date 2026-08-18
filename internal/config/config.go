@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/scottjr632/dotctl/internal/result"
+	"github.com/srctl/dotctl/internal/result"
 )
 
 const (

@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/scottjr632/dotctl/internal/config"
+	"github.com/srctl/dotctl/internal/config"
 )
 
 func TestRunnablePathRejectsTraversal(t *testing.T) {

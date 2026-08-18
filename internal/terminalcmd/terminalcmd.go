@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/scottjr632/dotctl/internal/promise"
+	"github.com/srctl/dotctl/internal/promise"
 )
 
 var (

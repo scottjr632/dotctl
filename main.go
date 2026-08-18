@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/scottjr632/dotctl/cmds"
+	"github.com/srctl/dotctl/cmds"
 )
 
 func main() {

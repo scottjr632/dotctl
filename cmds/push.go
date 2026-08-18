@@ -2,8 +2,8 @@ package cmds
 
 import (
 	"github.com/fatih/color"
-	"github.com/scottjr632/dotctl/internal/git"
 	"github.com/spf13/cobra"
+	"github.com/srctl/dotctl/internal/git"
 )
 
 var pushCmd = &cobra.Command{

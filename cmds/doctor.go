@@ -6,9 +6,9 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/scottjr632/dotctl/internal/config"
-	"github.com/scottjr632/dotctl/internal/git"
 	"github.com/spf13/cobra"
+	"github.com/srctl/dotctl/internal/config"
+	"github.com/srctl/dotctl/internal/git"
 )
 
 var errDoctorUnhealthy = errors.New("dotctl configuration is not healthy")

@@ -3,8 +3,8 @@ package cmds
 import (
 	"fmt"
 
-	"github.com/scottjr632/dotctl/internal/git"
 	"github.com/spf13/cobra"
+	"github.com/srctl/dotctl/internal/git"
 )
 
 var (
