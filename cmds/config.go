@@ -34,7 +34,6 @@ var showConfigCmd = &cobra.Command{
 }
 
 func init() {
-	addJSONFlag(showConfigCmd)
 	configCmd.AddCommand(showConfigCmd)
 	rootCmd.AddCommand(configCmd)
 }

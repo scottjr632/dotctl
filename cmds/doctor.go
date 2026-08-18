@@ -31,14 +31,14 @@ var doctorCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		report := inspectConfiguration()
+		if !report.Healthy && wantsJSON(cmd) {
+			return &cliError{code: "DOCTOR_UNHEALTHY", data: report, err: errDoctorUnhealthy}
+		}
 		if wantsJSON(cmd) {
-			if err := writeJSONResponse(cmd, report.Healthy, report); err != nil {
-				return err
-			}
-		} else {
-			for _, check := range report.Checks {
-				fmt.Fprintf(cmd.OutOrStdout(), "[%s] %s: %s\n", check.Status, check.Name, check.Message)
-			}
+			return writeJSON(cmd, report)
+		}
+		for _, check := range report.Checks {
+			fmt.Fprintf(cmd.OutOrStdout(), "[%s] %s: %s\n", check.Status, check.Name, check.Message)
 		}
 		if !report.Healthy {
 			return errDoctorUnhealthy
@@ -65,7 +65,7 @@ func inspectConfiguration() doctorReport {
 
 	cfg, err := config.Load().Unwrap()
 	if err != nil {
-		addCheck("config", "fail", fmt.Sprintf("%s: %v", config.FilePath(), err))
+		addCheck("config", "fail", err.Error())
 		return report
 	}
 	addCheck("config", "pass", config.FilePath())
@@ -124,6 +124,5 @@ func checkDirectory(name, path string, addCheck func(string, string, string)) {
 }
 
 func init() {
-	addJSONFlag(doctorCmd)
 	rootCmd.AddCommand(doctorCmd)
 }

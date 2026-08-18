@@ -35,6 +35,9 @@ var installSkillCmd = &cobra.Command{
 		}
 		existing, err := os.ReadFile(path)
 		if err == nil && string(existing) == agentskill.Content {
+			if jsonOutput {
+				return writeJSON(cmd, map[string]string{"path": path, "status": "already_installed"})
+			}
 			fmt.Fprintf(cmd.OutOrStdout(), "dotctl agent skill is already installed at %s\n", path)
 			return nil
 		}
@@ -45,13 +48,16 @@ var installSkillCmd = &cobra.Command{
 			return fmt.Errorf("%s already exists; use --force to replace it", path)
 		}
 		if dryRun {
-			return writePlan(cmd, fmt.Sprintf("Write the dotctl agent skill to %s", path))
+			return writePlan(cmd, action("install_skill", fmt.Sprintf("Write the dotctl agent skill to %s", path)))
 		}
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
 		}
 		if err := os.WriteFile(path, []byte(agentskill.Content), 0o644); err != nil {
 			return err
+		}
+		if jsonOutput {
+			return writeJSON(cmd, map[string]string{"path": path, "status": "installed"})
 		}
 		fmt.Fprintf(cmd.OutOrStdout(), "Installed dotctl agent skill at %s\n", path)
 		return nil
@@ -63,6 +69,9 @@ var printSkillCmd = &cobra.Command{
 	Short: "Print the embedded dotctl agent skill",
 	Args:  cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if jsonOutput {
+			return writeJSON(cmd, map[string]string{"content": agentskill.Content})
+		}
 		_, err := fmt.Fprint(cmd.OutOrStdout(), agentskill.Content)
 		return err
 	},

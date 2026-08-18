@@ -39,13 +39,15 @@ func addRemoteOrigin(cmd *cobra.Command, url string) error {
 	}
 
 	if dryRun {
-		return writePlan(cmd, fmt.Sprintf("Add remote origin %s to the dotfiles repository", url))
+		return writePlan(cmd, action("add_remote", fmt.Sprintf("Add remote origin %s to the dotfiles repository", url)))
 	}
 	addCmd := git.GitCmd(cfg, "remote", "add", "origin", url)
 	if output, err := addCmd.SilentlyExecute(); err != nil {
 		return fmt.Errorf("failed to add remote origin: %s", string(output))
 	}
 
-	fmt.Printf("Successfully added remote origin: %s\n", url)
+	if !jsonOutput {
+		fmt.Fprintf(cmd.OutOrStdout(), "Successfully added remote origin: %s\n", url)
+	}
 	return nil
 }

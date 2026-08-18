@@ -27,7 +27,7 @@ var commitCmd = &cobra.Command{
 			if message == "" {
 				message = "<open editor for commit message>"
 			}
-			return writePlan(cmd, fmt.Sprintf("Commit staged dotfiles with message %q", message))
+			return writePlan(cmd, action("commit", fmt.Sprintf("Commit staged dotfiles with message %q", message)))
 		}
 		if commitMessage != "" {
 			return git.CommitWithMessage(cfg, commitMessage).Err()

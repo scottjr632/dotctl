@@ -27,6 +27,5 @@ var statusCmd = &cobra.Command{
 }
 
 func init() {
-	addJSONFlag(statusCmd)
 	rootCmd.AddCommand(statusCmd)
 }

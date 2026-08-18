@@ -10,10 +10,27 @@ import (
 	"github.com/scottjr632/dotctl/internal/promise"
 )
 
+var (
+	captureOutput  bool
+	capturedOutput strings.Builder
+)
+
 type Cmd struct {
 	cmd  string
 	args []string
 	env  []string
+}
+
+func SetCaptureOutput(capture bool) {
+	captureOutput = capture
+}
+
+func ResetCapturedOutput() {
+	capturedOutput.Reset()
+}
+
+func CapturedOutput() string {
+	return capturedOutput.String()
 }
 
 func New(cmd string, args ...string) *Cmd {
@@ -71,6 +88,17 @@ func (c *Cmd) ExecuteToStdout() error {
 }
 
 func (c *Cmd) ExecuteInTerminal() error {
+	if captureOutput {
+		output, err := c.SilentlyExecute()
+		if output != "" {
+			if capturedOutput.Len() > 0 && !strings.HasSuffix(capturedOutput.String(), "\n") {
+				capturedOutput.WriteByte('\n')
+			}
+			capturedOutput.WriteString(output)
+		}
+		return err
+	}
+
 	cmd := c.command()
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout

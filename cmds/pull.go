@@ -17,12 +17,14 @@ var pullCmd = &cobra.Command{
 			return err
 		}
 		if dryRun {
-			return writePlan(cmd, "Pull remote changes into the dotfiles repository")
+			return writePlan(cmd, action("pull", "Pull remote changes into the dotfiles repository"))
 		}
 		if err := git.GitCmd(cfg, "pull").ExecuteInTerminal(); err != nil {
 			return err
 		}
-		color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "Successfully pulled the latest data")
+		if !jsonOutput {
+			color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "Successfully pulled the latest data")
+		}
 		return nil
 	},
 }

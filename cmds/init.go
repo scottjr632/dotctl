@@ -37,14 +37,14 @@ var initCmd = &cobra.Command{
 			path = filepath.Join(git.WorkTree(), ".cfg", ".dotfiles")
 		}
 		if dryRun {
-			repositoryAction := fmt.Sprintf("Initialize a bare Git repository at %s", path)
+			repositoryAction := action("initialize_repository", fmt.Sprintf("Initialize a bare Git repository at %s", path))
 			if repoURL != "" {
-				repositoryAction = fmt.Sprintf("Clone %s as a bare Git repository at %s", repoURL, path)
+				repositoryAction = action("clone_repository", fmt.Sprintf("Clone %s as a bare Git repository at %s", repoURL, path))
 			}
 			return writePlan(cmd,
 				repositoryAction,
-				fmt.Sprintf("Write dotctl configuration to %s", config.FilePath()),
-				fmt.Sprintf("Create the runnable directory under %s", config.DirPath()),
+				action("write_config", fmt.Sprintf("Write dotctl configuration to %s", config.FilePath())),
+				action("create_directory", fmt.Sprintf("Create the runnable directory under %s", config.DirPath())),
 			)
 		}
 		if repoURL != "" {
@@ -62,7 +62,9 @@ var initCmd = &cobra.Command{
 		if result := config.InitializeConfigFile(path); result.IsErr() {
 			return result.Err()
 		}
-		logPrinter.Fprintln(cmd.OutOrStdout(), "Successfully initialized dotfile config")
+		if !jsonOutput {
+			logPrinter.Fprintln(cmd.OutOrStdout(), "Successfully initialized dotfile config")
+		}
 		return nil
 	},
 }

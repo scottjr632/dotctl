@@ -32,6 +32,5 @@ var listCmd = &cobra.Command{
 }
 
 func init() {
-	addJSONFlag(listCmd)
 	rootCmd.AddCommand(listCmd)
 }

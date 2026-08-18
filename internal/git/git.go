@@ -3,7 +3,6 @@ package git
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -64,7 +63,6 @@ func WorkTree() string {
 		return path
 	}
 
-	slog.Warn("failed to get home directory; using the current directory as the work tree")
 	return "."
 }
 
@@ -86,8 +84,6 @@ func GitCmd(cfg config.Config, args ...string) *terminalcmd.Cmd {
 
 func InitBareRepo(options InitRepoOptions) (res result.Failable) {
 	initRepoDefaultOptions(&options)
-	slog.Info("Initializing dotfile config", "path", options.Path)
-
 	err := os.MkdirAll(options.Path, 0755)
 	if err != nil {
 		return result.NewFailable(err)

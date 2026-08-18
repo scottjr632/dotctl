@@ -19,7 +19,7 @@ var gitCmd = &cobra.Command{
 			return err
 		}
 		if dryRun {
-			return writePlan(cmd, fmt.Sprintf("Run Git against the dotfiles repository with arguments %q", args))
+			return writePlan(cmd, action("git", fmt.Sprintf("Run Git against the dotfiles repository with arguments %q", args)))
 		}
 		return git.GitCmd(cfg, args...).ExecuteInTerminal()
 	},

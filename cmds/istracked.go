@@ -42,6 +42,5 @@ var isTrackedCmd = &cobra.Command{
 }
 
 func init() {
-	addJSONFlag(isTrackedCmd)
 	rootCmd.AddCommand(isTrackedCmd)
 }

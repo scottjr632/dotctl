@@ -18,7 +18,7 @@ var checkoutCmd = &cobra.Command{
 			return err
 		}
 		if dryRun {
-			return writePlan(cmd, fmt.Sprintf("Check out tracked files from %s into %s", cfg.DotfilesGitPath, git.WorkTree()))
+			return writePlan(cmd, action("checkout", fmt.Sprintf("Check out tracked files from %s into %s", cfg.DotfilesGitPath, git.WorkTree())))
 		}
 		if err := git.GitCmd(cfg, "checkout").ExecuteInTerminal(); err != nil {
 			return fmt.Errorf("checkout failed; resolve conflicting files before retrying: %w", err)

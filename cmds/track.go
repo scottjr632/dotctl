@@ -30,8 +30,8 @@ var trackCmd = &cobra.Command{
 				message = "<open editor for commit message>"
 			}
 			return writePlan(cmd,
-				fmt.Sprintf("Stage %s in the dotfiles repository", args[0]),
-				fmt.Sprintf("Commit staged dotfiles with message %q", message),
+				action("stage", fmt.Sprintf("Stage %s in the dotfiles repository", args[0])),
+				action("commit", fmt.Sprintf("Commit staged dotfiles with message %q", message)),
 			)
 		}
 		if result := git.AddFile(cfg, args[0]); result.IsErr() {
@@ -46,7 +46,9 @@ var trackCmd = &cobra.Command{
 		if resultErr != nil {
 			return resultErr
 		}
-		color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "Successfully tracked file")
+		if !jsonOutput {
+			color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "Successfully tracked file")
+		}
 		return nil
 	},
 }

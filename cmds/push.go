@@ -17,12 +17,14 @@ var pushCmd = &cobra.Command{
 			return err
 		}
 		if dryRun {
-			return writePlan(cmd, "Push local dotfile commits to the configured remote")
+			return writePlan(cmd, action("push", "Push local dotfile commits to the configured remote"))
 		}
 		if result := git.Push(cfg); result.IsErr() {
 			return result.Err()
 		}
-		color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "Successfully pushed changes")
+		if !jsonOutput {
+			color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "Successfully pushed changes")
+		}
 		return nil
 	},
 }

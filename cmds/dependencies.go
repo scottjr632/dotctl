@@ -67,9 +67,9 @@ var newCmd = &cobra.Command{
 			return err
 		}
 		if dryRun {
-			actions := []string{fmt.Sprintf("Create runnable %s in %s", args[0], cfg.DependenciesDir)}
+			actions := []planAction{action("create_runnable", fmt.Sprintf("Create runnable %s in %s", args[0], cfg.DependenciesDir))}
 			if !newNoEdit && !nonInteractive {
-				actions = append(actions, "Open the new runnable in the configured editor")
+				actions = append(actions, action("open_editor", "Open the new runnable in the configured editor"))
 			}
 			return writePlan(cmd, actions...)
 		}
@@ -101,7 +101,7 @@ var editCmd = &cobra.Command{
 			return fmt.Errorf("edit is unavailable in non-interactive mode")
 		}
 		if dryRun {
-			return writePlan(cmd, fmt.Sprintf("Open runnable %s in the configured editor, creating it if needed", name))
+			return writePlan(cmd, action("open_editor", fmt.Sprintf("Open runnable %s in the configured editor, creating it if needed", name)))
 		}
 		return runnables.EditRunnable(cfg, name).Err()
 	},
@@ -126,7 +126,7 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 		if dryRun {
-			return writePlan(cmd, fmt.Sprintf("Delete runnable %s from %s", name, cfg.DependenciesDir))
+			return writePlan(cmd, action("delete_runnable", fmt.Sprintf("Delete runnable %s from %s", name, cfg.DependenciesDir)))
 		}
 		if nonInteractive && !assumeYes {
 			return fmt.Errorf("--yes is required to delete a runnable in non-interactive mode")
@@ -153,11 +153,11 @@ var runnableCmd = &cobra.Command{
 			return err
 		}
 		if dryRun {
-			actions := []string{}
+			actions := []planAction{}
 			if withPre {
-				actions = append(actions, fmt.Sprintf("Execute pre-runnable %s", cfg.PreRunnableFile))
+				actions = append(actions, action("execute_runnable", fmt.Sprintf("Execute pre-runnable %s", cfg.PreRunnableFile)))
 			}
-			actions = append(actions, fmt.Sprintf("Execute runnable %s from %s", name, cfg.DependenciesDir))
+			actions = append(actions, action("execute_runnable", fmt.Sprintf("Execute runnable %s from %s", name, cfg.DependenciesDir)))
 			return writePlan(cmd, actions...)
 		}
 		if withPre {
@@ -184,19 +184,21 @@ var allCmd = &cobra.Command{
 			return err
 		}
 		names = utils.WithoutStrings(utils.FilterStrings(names, filter), []string{"pre", "pre.sh"})
-		for _, name := range names {
-			fmt.Fprintln(cmd.OutOrStdout(), "* "+name)
+		if !jsonOutput {
+			for _, name := range names {
+				fmt.Fprintln(cmd.OutOrStdout(), "* "+name)
+			}
 		}
 		if dryRun {
-			actions := make([]string, 0, len(names)+1)
+			actions := make([]planAction, 0, len(names)+1)
 			if withPre {
-				actions = append(actions, fmt.Sprintf("Execute pre-runnable %s", cfg.PreRunnableFile))
+				actions = append(actions, action("execute_runnable", fmt.Sprintf("Execute pre-runnable %s", cfg.PreRunnableFile)))
 			}
 			for _, name := range names {
-				actions = append(actions, fmt.Sprintf("Execute runnable %s from %s", name, cfg.DependenciesDir))
+				actions = append(actions, action("execute_runnable", fmt.Sprintf("Execute runnable %s from %s", name, cfg.DependenciesDir)))
 			}
 			if len(actions) == 0 {
-				actions = append(actions, "No runnable scripts match the request")
+				actions = append(actions, action("noop", "No runnable scripts match the request"))
 			}
 			return writePlan(cmd, actions...)
 		}
@@ -254,8 +256,6 @@ func chooseRunnable(cfg config.Config, args []string, label string) (string, err
 }
 
 func init() {
-	addJSONFlag(dependenciesCmd)
-	addJSONFlag(listAsStringsCmd)
 	newCmd.Flags().BoolVar(&newNoEdit, "no-edit", false, "create the runnable without opening an editor")
 	allCmd.Flags().StringVarP(&filter, "filter", "f", "", "filter runnables")
 	allCmd.Flags().BoolVarP(&withPre, "with-pre", "p", false, "include the pre runnable")

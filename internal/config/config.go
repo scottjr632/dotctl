@@ -3,7 +3,7 @@ package config
 import (
 	"encoding/json"
 	"errors"
-	"log/slog"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -17,7 +17,11 @@ const (
 	preRunnableFileName    = "pre.sh"
 )
 
-var dirOverride string
+var (
+	dirOverride      string
+	ErrConfigMissing = errors.New("dotctl config not found")
+	ErrConfigInvalid = errors.New("dotctl config is invalid")
+)
 
 type Config struct {
 	DotfilesGitPath string `json:"git_repo_path"`
@@ -40,7 +44,6 @@ func DirPath() string {
 		return filepath.Join(path, cfgFileDirName)
 	}
 
-	slog.Warn("failed to get user config directory; using a relative path")
 	return filepath.Join(".config", cfgFileDirName)
 }
 
@@ -123,7 +126,6 @@ func write(cfg Config) error {
 }
 
 func InitializeConfigFile(path string) result.Failable {
-	slog.Info("initializing dotfile config", "path", FilePath())
 	if _, err := os.Stat(FilePath()); err == nil {
 		return result.NewFailable(errors.New("config file already exists"))
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -147,6 +149,9 @@ func DoesConfigFileExist() (bool, error) {
 // Load reads the config without creating files or filling missing values.
 func Load() result.Result[Config] {
 	file, err := os.Open(FilePath())
+	if errors.Is(err, os.ErrNotExist) {
+		return result.Err[Config](fmt.Errorf("%w: %s", ErrConfigMissing, FilePath()))
+	}
 	if err != nil {
 		return result.Err[Config](err)
 	}
@@ -154,7 +159,7 @@ func Load() result.Result[Config] {
 
 	var cfg Config
 	if err := json.NewDecoder(file).Decode(&cfg); err != nil {
-		return result.Err[Config](err)
+		return result.Err[Config](fmt.Errorf("%w: %v", ErrConfigInvalid, err))
 	}
 	return result.Ok(cfg)
 }

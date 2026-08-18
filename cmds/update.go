@@ -37,7 +37,10 @@ var updateCmd = &cobra.Command{
 			if message == "" {
 				message = "<open editor for commit message>"
 			}
-			return writePlan(cmd, stageAction, fmt.Sprintf("Commit staged dotfiles with message %q", message))
+			return writePlan(cmd,
+				action("stage", stageAction),
+				action("commit", fmt.Sprintf("Commit staged dotfiles with message %q", message)),
+			)
 		}
 		addArgs := []string{"add", "-u"}
 		if updatePatch {

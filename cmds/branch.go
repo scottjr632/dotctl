@@ -29,7 +29,7 @@ var branchCmd = &cobra.Command{
 			return git.GitCmd(cfg, "branch", "--show-current").ExecuteInTerminal()
 		}
 		if dryRun {
-			return writePlan(cmd, fmt.Sprintf("Switch the dotfiles repository to branch %s", args[0]))
+			return writePlan(cmd, action("switch_branch", fmt.Sprintf("Switch the dotfiles repository to branch %s", args[0])))
 		}
 		return git.GitCmd(cfg, "switch", args[0]).ExecuteInTerminal()
 	},
