@@ -52,8 +52,8 @@ func githubWebURL(remote string) (string, error) {
 	if remote == "" {
 		return "", fmt.Errorf("remote URL is not set")
 	}
-	if strings.HasPrefix(remote, "git@github.com:") {
-		return githubHTTPSURL(strings.TrimPrefix(remote, "git@github.com:"))
+	if after, ok := strings.CutPrefix(remote, "git@github.com:"); ok {
+		return githubHTTPSURL(after)
 	}
 
 	parsed, err := url.Parse(remote)

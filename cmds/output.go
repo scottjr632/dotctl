@@ -56,7 +56,7 @@ func (e *cliError) Unwrap() error {
 
 var responseWritten bool
 
-func wantsJSON(cmd *cobra.Command) bool {
+func wantsJSON(_ *cobra.Command) bool {
 	return jsonOutput
 }
 
