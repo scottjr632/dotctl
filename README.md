@@ -51,6 +51,7 @@ dotctl doctor
 dotctl status
 dotctl list
 dotctl is-tracked .zshrc
+dotctl profile show
 dotctl track .zshrc
 dotctl update
 dotctl pull
@@ -68,6 +69,41 @@ dotctl push
 ```
 
 `update` stages modifications and deletions to files that are already tracked. Use `track` for a new file. Dotctl uses Git's normal merge behavior and stops for manual conflict resolution rather than overwriting divergent edits.
+
+## Per-machine variants
+
+One repository often needs different content on different computers: a work email in `.gitconfig`, a Linux-only `PATH` in `.zshrc`. Track a variant by putting `##` and a comma-separated condition list in the file name:
+
+```text
+.gitconfig##hostname.workbook
+.gitconfig##profile.work
+.zshrc##os.darwin,arch.arm64
+```
+
+`dotctl profile apply` links each plain path to the variant that matches this computer, so `~/.gitconfig` becomes a symlink to the winning `.gitconfig##...` file. Because it is a link, editing `~/.gitconfig` edits the variant, and `dotctl update` commits that change normally.
+
+Conditions match on four selectors:
+
+| Condition | Matches |
+| --- | --- |
+| `hostname.NAME` | host name up to the first dot |
+| `os.NAME` | operating system, such as `darwin` or `linux` |
+| `arch.NAME` | architecture, such as `arm64` or `amd64` |
+| `profile.NAME` | the name set with `dotctl profile set` |
+
+Every condition in a variant must match. When several variants match one path, the most specific one wins: longer condition lists beat shorter ones, and `hostname` outranks `profile`, which outranks `arch`, which outranks `os`. Equal matches are broken by file name so the result never changes between runs.
+
+```bash
+dotctl profile show          # selectors for this computer
+dotctl profile set work      # set the profile.NAME selector
+dotctl profile list          # every variant, and which one is selected
+dotctl --dry-run profile apply
+dotctl profile apply
+```
+
+`checkout` applies variants automatically, so setting up a new computer stays a single command. Use `checkout --skip-profile` to opt out.
+
+Apply refuses to overwrite a path that already holds real content and reports a `PROFILE_CONFLICT` error without changing anything. Use `--force` to replace an existing regular file. A path that is itself tracked can never be replaced, because a link there would leave the repository permanently modified; untrack the plain file first. A variant whose conditions cannot be parsed is reported rather than skipped silently.
 
 Run `dotctl --help` or `dotctl COMMAND --help` for the complete command and flag list.
 
@@ -109,7 +145,7 @@ Every JSON invocation writes exactly one document to stdout. The `kind` is `resu
 {"ok":false,"kind":"error","error":{"code":"CONFIG_NOT_FOUND","message":"dotctl config not found"}}
 ```
 
-JSON errors return a nonzero exit status and keep stderr empty. Git and runnable output is captured under `data.output` instead of being mixed with the JSON document. Stable error codes are `CONFIG_NOT_FOUND`, `CONFIG_INVALID`, `INVALID_ARGUMENT`, `PERMISSION_DENIED`, `EXTERNAL_COMMAND_FAILED`, `DOCTOR_UNHEALTHY`, `JSON_UNSUPPORTED`, and the fallback `COMMAND_FAILED`.
+JSON errors return a nonzero exit status and keep stderr empty. Git and runnable output is captured under `data.output` instead of being mixed with the JSON document. Stable error codes are `CONFIG_NOT_FOUND`, `CONFIG_INVALID`, `INVALID_ARGUMENT`, `PERMISSION_DENIED`, `EXTERNAL_COMMAND_FAILED`, `DOCTOR_UNHEALTHY`, `JSON_UNSUPPORTED`, `PROFILE_CONFLICT`, and the fallback `COMMAND_FAILED`. A `PROFILE_CONFLICT` response carries the unresolved variants in `data.conflicts`.
 
 Put global flags before `git` when using the passthrough command, for example `dotctl --json git status --short`.
 

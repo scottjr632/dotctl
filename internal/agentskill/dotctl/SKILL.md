@@ -1,6 +1,6 @@
 ---
 name: dotctl
-description: Inspect, track, commit, synchronize, and check dotfiles managed by the dotctl CLI, and inspect or run configured dependency scripts. Use when the user asks about their managed dotfiles, dotfile repository status, shell/editor configuration tracked by dotctl, or dotctl runnables.
+description: Inspect, track, commit, synchronize, and check dotfiles managed by the dotctl CLI, select per-machine dotfile variants, and inspect or run configured dependency scripts. Use when the user asks about their managed dotfiles, dotfile repository status, shell/editor configuration tracked by dotctl, machine-specific dotfile variants, or dotctl runnables.
 compatibility: Requires the dotctl and git executables.
 ---
 
@@ -27,6 +27,8 @@ dotctl config show --json
 dotctl status --json
 dotctl list --json
 dotctl is-tracked <path> --json
+dotctl profile show --json
+dotctl profile list --json
 dotctl dependencies list --json
 ```
 
@@ -57,6 +59,23 @@ dotctl --json checkout --backup-existing
 
 The result reports `backup_dir` and `backed_up`. The backup option is rejected after the first checkout; it is not a replacement for resolving ordinary Git changes or merge conflicts.
 
+## Per-machine variants
+
+A tracked file whose name contains `##` followed by comma-separated conditions is a variant, such as `.gitconfig##hostname.workbook` or `.zshrc##os.darwin,arch.arm64`. Conditions match on `hostname`, `os`, `arch`, and the configured `profile` name; every condition must match. `dotctl profile apply` symlinks each plain path to the most specific matching variant, and `checkout` applies variants automatically unless `--skip-profile` is passed.
+
+```bash
+dotctl profile show --json
+dotctl profile list --json
+dotctl --json --dry-run profile apply
+dotctl --json profile apply
+```
+
+- Read `profile list --json` before creating a variant, so the new file name uses selectors this machine actually reports.
+- Edit the variant file, not the linked path, when the user asks to change a machine-specific setting. Editing through the link works, but naming the variant makes the commit clear.
+- A `PROFILE_CONFLICT` error means a target path already holds real content. Report the paths in `data.conflicts` and ask the user before using `--force`, which replaces those files without a backup.
+- Never use `--force` to resolve a conflict whose reason mentions an already-tracked path; untracking the plain file is the only correct fix.
+- `data.invalid` lists variants whose conditions could not be parsed. These are usually typos in a selector name and are worth reporting.
+
 ## Runnables
 
 Runnables are executable local scripts and may install packages or change the system. Before running one:
@@ -79,4 +98,5 @@ dotctl --json --yes dependencies all
 - Do not treat printed output as success without checking the exit status.
 - Do not use `--yes` to bypass ambiguity about what the user requested.
 - Do not run dependency scripts before inspecting them.
+- Do not use `profile apply --force` without the user's explicit agreement; it deletes the existing file at the target path.
 - Use `--config-dir` and `--work-tree` together when deliberately testing in a sandbox.

@@ -12,17 +12,20 @@ import (
 	"github.com/fatih/color"
 	"github.com/scottjr632/dotctl/internal/config"
 	"github.com/scottjr632/dotctl/internal/git"
+	"github.com/scottjr632/dotctl/internal/profile"
 	"github.com/spf13/cobra"
 )
 
 var (
 	checkoutBackupExisting bool
 	checkoutBackupDir      string
+	checkoutSkipProfile    bool
 )
 
 type checkoutResult struct {
-	BackupDir string   `json:"backup_dir,omitempty"`
-	BackedUp  []string `json:"backed_up"`
+	BackupDir string       `json:"backup_dir,omitempty"`
+	BackedUp  []string     `json:"backed_up"`
+	Profile   *applyResult `json:"profile,omitempty"`
 }
 
 var checkoutCmd = &cobra.Command{
@@ -41,10 +44,16 @@ var checkoutCmd = &cobra.Command{
 		}
 		if !checkoutBackupExisting {
 			if dryRun {
-				return writePlan(cmd, checkoutAction(cfg))
+				actions := append([]planAction{checkoutAction(cfg)}, checkoutProfileActions(cfg)...)
+				return writePlan(cmd, actions...)
 			}
 			if err := git.GitCmd(cfg, "checkout").ExecuteInTerminal(); err != nil {
 				return fmt.Errorf("checkout failed; resolve conflicting files before retrying: %w", err)
+			}
+			result := checkoutResult{BackedUp: []string{}}
+			result.Profile = checkoutApplyProfile(cmd, cfg)
+			if jsonOutput {
+				return writeJSON(cmd, result)
 			}
 			return nil
 		}
@@ -77,7 +86,9 @@ var checkoutCmd = &cobra.Command{
 				}
 				actions = append(actions, action("backup_existing", fmt.Sprintf("Move %d existing path(s) to %s", len(collisions), location)))
 			}
-			return writePlan(cmd, append(actions, checkoutAction(cfg))...)
+			actions = append(actions, checkoutAction(cfg))
+			actions = append(actions, checkoutProfileActions(cfg)...)
+			return writePlan(cmd, actions...)
 		}
 
 		result := checkoutResult{BackedUp: collisions}
@@ -97,6 +108,7 @@ var checkoutCmd = &cobra.Command{
 			}
 			return fmt.Errorf("checkout failed: %w", err)
 		}
+		result.Profile = checkoutApplyProfile(cmd, cfg)
 		if jsonOutput {
 			return writeJSON(cmd, result)
 		}
@@ -110,6 +122,49 @@ var checkoutCmd = &cobra.Command{
 
 func checkoutAction(cfg config.Config) planAction {
 	return action("checkout", fmt.Sprintf("Check out tracked files from %s into %s", cfg.DotfilesGitPath, git.WorkTree()))
+}
+
+// checkoutProfileActions previews the variant links that follow a checkout. The
+// repository is not checked out yet during a dry run, so this reports the
+// variants recorded in HEAD rather than the ones present in the work tree.
+func checkoutProfileActions(cfg config.Config) []planAction {
+	if checkoutSkipProfile {
+		return nil
+	}
+	tracked, err := git.ListHeadFiles(cfg).Unwrap()
+	if err != nil {
+		return nil
+	}
+	actions := []planAction{}
+	for _, target := range profile.Resolve(tracked, profile.Detect(cfg.Profile)).Targets {
+		if target.Source != "" {
+			actions = append(actions, action("link", fmt.Sprintf("Link %s to %s", target.Path, target.Source)))
+		}
+	}
+	return actions
+}
+
+// checkoutApplyProfile links variants after a successful checkout. Checkout has
+// already succeeded here, so an unresolved variant is reported as a warning
+// instead of failing the command.
+func checkoutApplyProfile(cmd *cobra.Command, cfg config.Config) *applyResult {
+	if checkoutSkipProfile {
+		return nil
+	}
+	result, err := planProfileLinks(cfg)
+	if err == nil {
+		err = applyProfileLinks(result)
+	}
+	if err != nil {
+		result.Conflicts = append(result.Conflicts, linkAction{Status: linkStatusConflict, Reason: err.Error()})
+	}
+	if len(result.Links) == 0 && len(result.Conflicts) == 0 {
+		return nil
+	}
+	if !jsonOutput {
+		reportProfileLinks(cmd, result)
+	}
+	return &result
 }
 
 func existingCheckoutPaths(workTree string, tracked []string) ([]string, error) {
@@ -219,5 +274,6 @@ func containsPath(parent, child string) bool {
 func init() {
 	checkoutCmd.Flags().BoolVar(&checkoutBackupExisting, "backup-existing", false, "back up paths that would block the first checkout")
 	checkoutCmd.Flags().StringVar(&checkoutBackupDir, "backup-dir", "", "backup destination (default: CONFIG_DIR/backups/TIMESTAMP)")
+	checkoutCmd.Flags().BoolVar(&checkoutSkipProfile, "skip-profile", false, "do not link per-machine variants after checking out")
 	rootCmd.AddCommand(checkoutCmd)
 }

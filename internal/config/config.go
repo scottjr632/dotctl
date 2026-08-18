@@ -27,6 +27,7 @@ type Config struct {
 	DotfilesGitPath string `json:"git_repo_path"`
 	DependenciesDir string `json:"dependencies_dir"`
 	PreRunnableFile string `json:"pre_runnable_file"`
+	Profile         string `json:"profile,omitempty"`
 }
 
 func SetDir(path string) {
@@ -173,6 +174,20 @@ func Preview() result.Result[Config] {
 		return result.Err[Config](err)
 	}
 	return result.Ok(withDefaults(cfg))
+}
+
+// SetProfile stores the profile name used to select per-machine dotfile variants.
+// An empty name clears it.
+func SetProfile(name string) result.Result[Config] {
+	cfg, err := Get().Unwrap()
+	if err != nil {
+		return result.Err[Config](err)
+	}
+	cfg.Profile = name
+	if err := write(cfg); err != nil {
+		return result.Err[Config](err)
+	}
+	return result.Ok(cfg)
 }
 
 // Get reads the config and fills defaults used by older config files.
