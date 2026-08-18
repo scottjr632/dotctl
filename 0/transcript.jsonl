@@ -1,0 +1,2 @@
+{"v":1,"agent":"claude-code","cli_version":"0.10.0","type":"user","ts":"2026-08-18T00:57:05.476Z","content":[{"id":"b1cabdfb-8274-433c-9f79-ef18a2efa812","text":"hello"}]}
+{"v":1,"agent":"claude-code","cli_version":"0.10.0","type":"assistant","ts":"2026-08-18T00:57:07.063Z","id":"msg_011Ce9JeNaiiYus2vhMkpmQJ","input_tokens":2,"output_tokens":14,"content":[{"text":"Hello! What can I help you with today?","type":"text"}]}
