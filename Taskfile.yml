@@ -22,6 +22,13 @@ tasks:
       - mkdir -p bin
       - go build -o bin/dotctl .
 
+  install:
+    desc: Build and install dotctl into ~/.local/bin
+    deps: [build]
+    cmds:
+      - mkdir -p "$HOME/.local/bin"
+      - install -m 0755 bin/dotctl "$HOME/.local/bin/dotctl"
+
   check:
     desc: Run all checks used by CI
     cmds:

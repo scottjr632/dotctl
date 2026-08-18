@@ -10,6 +10,12 @@
 go install github.com/scottjr632/dotctl@latest
 ```
 
+From a source checkout, build and install it into `~/.local/bin`:
+
+```bash
+task install
+```
+
 ## Initialize
 
 Create a new bare repository:
