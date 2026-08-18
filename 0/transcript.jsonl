@@ -1,0 +1,2 @@
+{"v":1,"agent":"claude-code","cli_version":"0.10.0","type":"user","ts":"2026-08-18T00:52:47.510Z","content":[{"id":"38b04d54-d303-4ddd-9e11-d6520730fd34","text":"Reply with exactly: CLAUDE_CODE_PROVIDER_OK. Do not use tools."}]}
+{"v":1,"agent":"claude-code","cli_version":"0.10.0","type":"assistant","ts":"2026-08-18T00:52:49.580Z","id":"msg_011Ce9JKNwmjaV2fZLTaJmc4","input_tokens":2,"output_tokens":22,"content":[{"text":"CLAUDE_CODE_PROVIDER_OK","type":"text"}]}

@@ -1,0 +1,1 @@
+Reply with exactly: CLAUDE_CODE_PROVIDER_OK. Do not use tools.
