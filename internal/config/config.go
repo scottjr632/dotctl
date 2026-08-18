@@ -40,10 +40,12 @@ func DirPath() string {
 	if path := os.Getenv("DOTCTL_CONFIG_DIR"); path != "" {
 		return path
 	}
-	if path, err := os.UserConfigDir(); err == nil {
+	if path := os.Getenv("XDG_CONFIG_HOME"); path != "" {
 		return filepath.Join(path, cfgFileDirName)
 	}
-
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".config", cfgFileDirName)
+	}
 	return filepath.Join(".config", cfgFileDirName)
 }
 

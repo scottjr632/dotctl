@@ -7,6 +7,18 @@ import (
 	"testing"
 )
 
+func TestDirPathUsesDotConfigByDefault(t *testing.T) {
+	home := t.TempDir()
+	SetDir("")
+	t.Setenv("DOTCTL_CONFIG_DIR", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("HOME", home)
+
+	if got, want := DirPath(), filepath.Join(home, ".config", "dotctl"); got != want {
+		t.Fatalf("DirPath() = %q, want %q", got, want)
+	}
+}
+
 func TestLoadAndPreviewDoNotWriteMissingDefaults(t *testing.T) {
 	configDir := t.TempDir()
 	SetDir(configDir)
