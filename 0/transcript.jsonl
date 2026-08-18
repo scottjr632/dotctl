@@ -1,0 +1,2 @@
+{"v":1,"agent":"claude-code","cli_version":"0.10.0","type":"user","ts":"2026-08-18T00:53:58.757Z","content":[{"id":"6a4e5b48-b71e-4260-99b6-1c3abb483215","text":"Reply exactly: WARNING_PATH_OK. Do not use tools."}]}
+{"v":1,"agent":"claude-code","cli_version":"0.10.0","type":"assistant","ts":"2026-08-18T00:54:00.503Z","id":"msg_011Ce9JQcdg1tSBZudEFfMPZ","input_tokens":2,"output_tokens":13,"content":[{"text":"WARNING_PATH_OK","type":"text"}]}
