@@ -1,0 +1,57 @@
+{
+  "cli_version": "0.10.0",
+  "checkpoint_id": "01M09A63YGDKQVJK1CKBW8WV0F",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md",
+    "cmds/agent.go",
+    "cmds/branch.go",
+    "cmds/checkout.go",
+    "cmds/commit.go",
+    "cmds/config.go",
+    "cmds/dependencies.go",
+    "cmds/doctor.go",
+    "cmds/doctor_test.go",
+    "cmds/gh.go",
+    "cmds/git.go",
+    "cmds/init.go",
+    "cmds/istracked.go",
+    "cmds/list.go",
+    "cmds/log.go",
+    "cmds/output.go",
+    "cmds/profile.go",
+    "cmds/pull.go",
+    "cmds/push.go",
+    "cmds/repo.go",
+    "cmds/root.go",
+    "cmds/status.go",
+    "cmds/track.go",
+    "cmds/update.go",
+    "go.mod",
+    "internal/config/config.go",
+    "internal/git/git.go",
+    "internal/git/git_test.go",
+    "internal/runnables/runnables.go",
+    "internal/runnables/runnables_test.go",
+    "internal/terminalcmd/terminalcmd.go",
+    "main.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 24,
+    "cache_creation_tokens": 101092,
+    "cache_read_tokens": 1313992,
+    "output_tokens": 6055,
+    "api_call_count": 12
+  }
+}
