@@ -18,11 +18,23 @@ Create a new bare repository:
 dotctl init
 ```
 
-Or clone an existing one:
+### Set up another computer
+
+Clone the existing dotfiles repository, then check its tracked files out into your home directory:
 
 ```bash
 dotctl init --clone https://github.com/you/dotfiles.git
+dotctl checkout --backup-existing
 ```
+
+`--backup-existing` moves files or symlinks that would block the first checkout to `~/.config/dotctl/backups/<timestamp>` before checking out the repository. It leaves unrelated files alone and prints the backup location. Use `--backup-dir <path>` to choose a different empty destination. Preview the operation before changing anything:
+
+```bash
+dotctl --json --dry-run checkout --backup-existing
+dotctl --json checkout --backup-existing
+```
+
+If the home directory is already empty or contains no conflicting tracked paths, plain `dotctl checkout` is sufficient. The backup option is deliberately restricted to the first checkout so it cannot silently replace edits in an established work tree.
 
 By default, dotctl stores configuration in `~/.config/dotctl/config`, the bare repository in `~/.cfg/.dotfiles`, and uses your home directory as the Git work tree.
 
@@ -39,6 +51,17 @@ dotctl pull
 dotctl push
 dotctl dependencies list
 ```
+
+Sync before making changes on a computer, then commit and push those changes for the other computers:
+
+```bash
+dotctl pull
+# Edit tracked dotfiles.
+dotctl update --message "Update dotfiles"
+dotctl push
+```
+
+`update` stages modifications and deletions to files that are already tracked. Use `track` for a new file. Dotctl uses Git's normal merge behavior and stops for manual conflict resolution rather than overwriting divergent edits.
 
 Run `dotctl --help` or `dotctl COMMAND --help` for the complete command and flag list.
 

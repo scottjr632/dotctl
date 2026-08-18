@@ -82,6 +82,32 @@ func GitCmd(cfg config.Config, args ...string) *terminalcmd.Cmd {
 	return cmd
 }
 
+func ConfigureClonedRepo(cfg config.Config) result.Failable {
+	commands := [][]string{
+		{"config", "--local", "status.showUntrackedFiles", "no"},
+		{"config", "--local", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*"},
+	}
+	for _, args := range commands {
+		if err := GitCmd(cfg, args...).ExecuteInTerminal(); err != nil {
+			return result.NewFailable(err)
+		}
+	}
+
+	branch, err := GitCmd(cfg, "symbolic-ref", "--short", "HEAD").SilentlyExecute()
+	if err != nil {
+		return result.NewFailable(fmt.Errorf("determine cloned repository branch: %w", err))
+	}
+	branch = strings.TrimSpace(branch)
+	remoteRef := "refs/remotes/origin/" + branch
+	if err := GitCmd(cfg, "update-ref", remoteRef, "refs/heads/"+branch).ExecuteInTerminal(); err != nil {
+		return result.NewFailable(err)
+	}
+	if err := GitCmd(cfg, "branch", "--set-upstream-to=origin/"+branch, branch).ExecuteInTerminal(); err != nil {
+		return result.NewFailable(err)
+	}
+	return result.NewFailable(nil)
+}
+
 func InitBareRepo(options InitRepoOptions) (res result.Failable) {
 	initRepoDefaultOptions(&options)
 	err := os.MkdirAll(options.Path, 0755)
@@ -155,6 +181,14 @@ func GetStatus(cfg config.Config) result.Result[StatusInfo] {
 
 func ListTrackedFiles(cfg config.Config) result.Result[[]string] {
 	output, err := GitCmd(cfg, "ls-files", "-z").SilentlyExecute()
+	if err != nil {
+		return result.Err[[]string](err)
+	}
+	return result.Ok(splitNullDelimited(output))
+}
+
+func ListHeadFiles(cfg config.Config) result.Result[[]string] {
+	output, err := GitCmd(cfg, "ls-tree", "-r", "--name-only", "-z", "HEAD").SilentlyExecute()
 	if err != nil {
 		return result.Err[[]string](err)
 	}

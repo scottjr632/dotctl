@@ -48,6 +48,15 @@ Put global flags before the `git` passthrough command so dotctl can parse them: 
 
 Use explicit `pull` and `push` commands for network synchronization. Ordinary inspection commands do not fetch.
 
+For the first checkout after cloning a dotfiles repository, preview and back up paths that would otherwise block checkout:
+
+```bash
+dotctl --json --dry-run checkout --backup-existing
+dotctl --json checkout --backup-existing
+```
+
+The result reports `backup_dir` and `backed_up`. The backup option is rejected after the first checkout; it is not a replacement for resolving ordinary Git changes or merge conflicts.
+
 ## Runnables
 
 Runnables are executable local scripts and may install packages or change the system. Before running one:

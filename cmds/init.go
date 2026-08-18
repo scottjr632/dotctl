@@ -37,15 +37,17 @@ var initCmd = &cobra.Command{
 			path = filepath.Join(git.WorkTree(), ".cfg", ".dotfiles")
 		}
 		if dryRun {
-			repositoryAction := action("initialize_repository", fmt.Sprintf("Initialize a bare Git repository at %s", path))
+			repositoryActions := []planAction{action("initialize_repository", fmt.Sprintf("Initialize a bare Git repository at %s", path))}
 			if repoURL != "" {
-				repositoryAction = action("clone_repository", fmt.Sprintf("Clone %s as a bare Git repository at %s", repoURL, path))
+				repositoryActions = []planAction{
+					action("clone_repository", fmt.Sprintf("Clone %s as a bare Git repository at %s", repoURL, path)),
+					action("configure_repository", "Configure the cloned branch to pull from and push to origin"),
+				}
 			}
-			return writePlan(cmd,
-				repositoryAction,
+			return writePlan(cmd, append(repositoryActions,
 				action("write_config", fmt.Sprintf("Write dotctl configuration to %s", config.FilePath())),
 				action("create_directory", fmt.Sprintf("Create the runnable directory under %s", config.DirPath())),
-			)
+			)...)
 		}
 		if repoURL != "" {
 			cloneCmd := terminalcmd.New("git", "clone", "--bare", repoURL, path)
@@ -54,6 +56,9 @@ var initCmd = &cobra.Command{
 			}
 			if err := cloneCmd.ExecuteInTerminal(); err != nil {
 				return fmt.Errorf("clone dotfiles repository: %w", err)
+			}
+			if result := git.ConfigureClonedRepo(config.Config{DotfilesGitPath: path}); result.IsErr() {
+				return fmt.Errorf("configure cloned dotfiles repository: %w", result.Err())
 			}
 		} else if result := git.InitBareRepo(git.InitRepoOptions{Path: path}); result.IsErr() {
 			return result.Err()
