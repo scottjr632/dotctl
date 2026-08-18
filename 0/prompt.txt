@@ -1,0 +1,1 @@
+Read go.mod and reply with only the module name.
