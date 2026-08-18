@@ -1,6 +1,31 @@
 version: "3"
 
 tasks:
-  build:
+  format:
+    desc: Format Go source files
     cmds:
-      - go build -o $HOME/.local/bin/dotctl main.go
+      - gofmt -w .
+
+  test:
+    desc: Run tests
+    cmds:
+      - go test ./...
+
+  vet:
+    desc: Run Go vet
+    cmds:
+      - go vet ./...
+
+  build:
+    desc: Build dotctl into bin/
+    cmds:
+      - mkdir -p bin
+      - go build -o bin/dotctl .
+
+  check:
+    desc: Run all checks used by CI
+    cmds:
+      - 'test -z "$(gofmt -l .)" || { echo "Run: gofmt -w ." >&2; gofmt -l . >&2; exit 1; }'
+      - go vet ./...
+      - go test ./...
+      - go build ./...
