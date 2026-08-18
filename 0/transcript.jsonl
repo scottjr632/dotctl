@@ -1,0 +1,2 @@
+{"v":1,"agent":"claude-code","cli_version":"0.10.0","type":"user","ts":"2026-08-18T00:55:15.048Z","content":[{"id":"b283a46f-314f-45f5-bc09-fcc6f3021b8c","text":"Reply exactly: AUTH_GUARD_OK. Do not use tools."}]}
+{"v":1,"agent":"claude-code","cli_version":"0.10.0","type":"assistant","ts":"2026-08-18T00:55:17.052Z","id":"msg_011Ce9JWEPP4SFSMD7bQtQM3","input_tokens":2,"output_tokens":14,"content":[{"text":"AUTH_GUARD_OK","type":"text"}]}
