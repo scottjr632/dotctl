@@ -1,0 +1,70 @@
+---
+name: dotctl
+description: Inspect, track, commit, synchronize, and check dotfiles managed by the dotctl CLI, and inspect or run configured dependency scripts. Use when the user asks about their managed dotfiles, dotfile repository status, shell/editor configuration tracked by dotctl, or dotctl runnables.
+compatibility: Requires the dotctl and git executables.
+---
+
+# dotctl
+
+Use dotctl through the shell. Prefer its non-interactive and structured interfaces instead of answering prompts or opening editors.
+
+## Start safely
+
+1. Confirm the executable exists with `command -v dotctl`.
+2. Run `dotctl doctor --json`. This performs local checks without changing files or accessing the network.
+3. Inspect state with `dotctl status --json` and `dotctl list --json`.
+4. Before a mutation, run the exact command once with `--dry-run`.
+5. Execute only after the plan matches the user's request, then verify with `dotctl status --json`.
+
+Do not add `--config-dir` or `--work-tree` when operating on the user's real dotfiles unless the user provided those paths. Those flags select a different dotctl environment.
+
+## Read-only commands
+
+```bash
+dotctl doctor --json
+dotctl config show --json
+dotctl status --json
+dotctl list --json
+dotctl is-tracked <path> --json
+dotctl dependencies list --json
+```
+
+Successful JSON output uses `{"ok":true,"data":...}`. Treat a nonzero exit status as failure and read stderr. `is-tracked` returning `tracked: false` is a successful query, not a command failure.
+
+## Mutating dotfiles
+
+Always supply `--non-interactive` and a commit message for unattended commits:
+
+```bash
+dotctl --non-interactive --dry-run track <path> --message "Track <path>"
+dotctl --non-interactive track <path> --message "Track <path>"
+
+dotctl --non-interactive --dry-run update --message "Update managed dotfiles"
+dotctl --non-interactive update --message "Update managed dotfiles"
+```
+
+Use explicit `pull` and `push` commands for network synchronization. Ordinary inspection commands do not fetch.
+
+## Runnables
+
+Runnables are executable local scripts and may install packages or change the system. Before running one:
+
+1. Use `dotctl config show --json` to locate `dependencies_dir`.
+2. Read the selected script.
+3. Run `dotctl --dry-run dependencies run <name>`.
+4. Execute it only when its contents and effects match the user's request.
+
+Never run `dependencies all` merely to explore what it does. For an explicitly requested unattended operation, use both `--non-interactive` and `--yes`:
+
+```bash
+dotctl --non-interactive --dry-run dependencies all
+dotctl --non-interactive --yes dependencies all
+```
+
+## Safety rules
+
+- Do not edit the bare repository directly; use dotctl or Git through `dotctl git`.
+- Do not treat printed output as success without checking the exit status.
+- Do not use `--yes` to bypass ambiguity about what the user requested.
+- Do not run dependency scripts before inspecting them.
+- Use `--config-dir` and `--work-tree` together when deliberately testing in a sandbox.
