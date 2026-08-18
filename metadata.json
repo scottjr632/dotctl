@@ -1,0 +1,33 @@
+{
+  "cli_version": "0.10.0",
+  "checkpoint_id": "01M09A0VQ860EB1G3E0BZZTPJQ",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md",
+    "cmds/checkout.go",
+    "cmds/profile.go",
+    "cmds/profile_test.go",
+    "internal/agentskill/dotctl/SKILL.md",
+    "internal/config/config.go",
+    "internal/profile/profile.go",
+    "internal/profile/profile_test.go"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 94,
+    "cache_creation_tokens": 196492,
+    "cache_read_tokens": 3595727,
+    "output_tokens": 40985,
+    "api_call_count": 47
+  }
+}
