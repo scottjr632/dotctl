@@ -1,0 +1,1 @@
+can we remove out extension that we created from our dots and our pi config? and also make sure we enable this in our pi config?
