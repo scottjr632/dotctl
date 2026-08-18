@@ -1,0 +1,1 @@
+is there a way to see the tool calls? right now it doesn't seem like it
