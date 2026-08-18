@@ -11,8 +11,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var filter string
-var withPre bool
+var (
+	filter    string
+	withPre   bool
+	newNoEdit bool
+)
 
 var dependenciesCmd = &cobra.Command{
 	Use:   "dependencies",
@@ -22,250 +25,242 @@ var dependenciesCmd = &cobra.Command{
 		"dep",
 		"dp",
 	},
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg := config.Get().Must()
-		res := runnables.ListAllRunnables(cfg)
-		if res.IsErr() {
-			errorPrinter.Println(res.Err())
-		}
-	},
+	RunE: listRunnables,
 }
 
 var listAsStringsCmd = &cobra.Command{
 	Use:     "list",
 	Aliases: []string{"ls"},
-	Short:   "List all runnables as strings",
-	Long:    `List all runnables as strings`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg := config.Get().Must()
-		res := runnables.ListAllRunnables(cfg)
-		if res.IsErr() {
-			errorPrinter.Println(res.Err())
-		}
-	},
+	Short:   "List all runnables",
+	Long:    "List all runnables",
+	RunE:    listRunnables,
+}
+
+func listRunnables(cmd *cobra.Command, args []string) error {
+	cfg, err := inspectionConfig()
+	if err != nil {
+		return err
+	}
+	names, err := runnables.ListAllRunnablesAsStrings(cfg).Unwrap()
+	if err != nil {
+		return err
+	}
+	if wantsJSON(cmd) {
+		return writeJSON(cmd, names)
+	}
+	if len(names) == 0 {
+		return fmt.Errorf("no runnables found")
+	}
+	for _, name := range names {
+		fmt.Fprintln(cmd.OutOrStdout(), "* "+name)
+	}
+	return nil
 }
 
 var newCmd = &cobra.Command{
-	Use:  "new [name]",
-	Args: cobra.ExactArgs(1),
-	Aliases: []string{
-		"n",
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg := config.Get().Must()
-		res := runnables.CreateNewRunnable(cfg, args[0])
-		if res.IsErr() {
-			errorPrinter.Println(res.Err())
+	Use:     "new [name]",
+	Args:    cobra.ExactArgs(1),
+	Aliases: []string{"n"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := commandConfig()
+		if err != nil {
+			return err
 		}
+		if dryRun {
+			actions := []string{fmt.Sprintf("Create runnable %s in %s", args[0], cfg.DependenciesDir)}
+			if !newNoEdit && !nonInteractive {
+				actions = append(actions, "Open the new runnable in the configured editor")
+			}
+			return writePlan(cmd, actions...)
+		}
+		if newNoEdit || nonInteractive {
+			return runnables.CreateRunnable(cfg, args[0]).Err()
+		}
+		return runnables.CreateNewRunnable(cfg, args[0]).Err()
 	},
 }
 
 var editCmd = &cobra.Command{
-	Use:   "edit [optional name]",
+	Use:   "edit [name]",
 	Short: "Edit a runnable",
-	Long:  `Edit a runnable`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg := config.Get().Must()
-
-		if len(args) == 1 {
-			res := runnables.EditRunnable(cfg, args[0])
-			if res.IsErr() {
-				errorPrinter.Println(res.Err())
-			}
-			return
+	Long:  "Edit a runnable",
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if nonInteractive && len(args) == 0 {
+			return fmt.Errorf("a runnable name is required in non-interactive mode")
 		}
-
-		options := runnables.ListAllRunnablesAsStrings(cfg).Must()
-		prompt := promptui.Select{
-			Label:             "Select a runnable",
-			Items:             options,
-			StartInSearchMode: true,
-			Searcher: func(input string, index int) bool {
-				return strings.Contains(options[index], input)
-			},
-		}
-
-		_, result, err := prompt.Run()
+		cfg, err := commandConfig()
 		if err != nil {
-			errorPrinter.Println(err)
-			return
+			return err
 		}
-
-		if result == "" {
-			errorPrinter.Println("No runnable selected")
-			return
+		name, err := chooseRunnable(cfg, args, "Select a runnable")
+		if err != nil {
+			return err
 		}
-
-		res := runnables.EditRunnable(cfg, result)
-		if res.IsErr() {
-			errorPrinter.Println(res.Err())
+		if nonInteractive {
+			return fmt.Errorf("edit is unavailable in non-interactive mode")
 		}
+		if dryRun {
+			return writePlan(cmd, fmt.Sprintf("Open runnable %s in the configured editor, creating it if needed", name))
+		}
+		return runnables.EditRunnable(cfg, name).Err()
 	},
 }
 
 var deleteCmd = &cobra.Command{
 	Use:     "delete [name]",
 	Short:   "Delete a runnable",
-	Long:    `Delete a runnable`,
+	Long:    "Delete a runnable",
 	Aliases: []string{"del", "d"},
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg := config.Get().Must()
-
-		if len(args) >= 1 {
-			res := runnables.DeleteRunnable(cfg, args[0])
-			if res.IsErr() {
-				errorPrinter.Println(res.Err())
-			}
-			return
+	Args:    cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if nonInteractive && len(args) == 0 {
+			return fmt.Errorf("a runnable name is required in non-interactive mode")
 		}
-
-		options := runnables.ListAllRunnablesAsStrings(cfg).Must()
-		prompt := promptui.Select{
-			Label:             "Select a runnable",
-			Items:             options,
-			StartInSearchMode: true,
-			Searcher: func(input string, index int) bool {
-				return strings.Contains(options[index], input)
-			},
-		}
-
-		_, result, err := prompt.Run()
+		cfg, err := commandConfig()
 		if err != nil {
-			errorPrinter.Println(err)
-			return
+			return err
 		}
-
-		if result == "" {
-			errorPrinter.Println("No runnable selected")
-			return
+		name, err := chooseRunnable(cfg, args, "Select a runnable")
+		if err != nil {
+			return err
 		}
-
-		res := runnables.DeleteRunnable(cfg, result)
-		if res.IsErr() {
-			errorPrinter.Println(res.Err())
+		if dryRun {
+			return writePlan(cmd, fmt.Sprintf("Delete runnable %s from %s", name, cfg.DependenciesDir))
 		}
+		if nonInteractive && !assumeYes {
+			return fmt.Errorf("--yes is required to delete a runnable in non-interactive mode")
+		}
+		return runnables.DeleteRunnable(cfg, name, assumeYes).Err()
 	},
 }
 
 var runnableCmd = &cobra.Command{
 	Use:   "run [name]",
 	Short: "Run a runnable",
-	Long:  `Run a runnable`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg := config.Get().Must()
-
-		if len(args) >= 1 {
-			if withPre {
-				res := runnables.RunPreRunnable(cfg)
-				if res.IsErr() {
-					errorPrinter.Println(res.Err())
-					return
-				}
-			}
-
-			res := runnables.RunRunnable(cfg, args[0])
-			if res.IsErr() {
-				errorPrinter.Println(res.Err())
-			}
-			return
-		}
-
-		options := runnables.ListAllRunnablesAsStrings(cfg).Must()
-		prompt := promptui.Select{
-			Label:             "Select a runnable",
-			Items:             options,
-			StartInSearchMode: true,
-			Searcher: func(input string, index int) bool {
-				return strings.Contains(options[index], input)
-			},
-		}
-
-		_, result, err := prompt.Run()
+	Long:  "Run a runnable",
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := commandConfig()
 		if err != nil {
-			errorPrinter.Println(err)
-			return
+			return err
 		}
-
-		if result == "" {
-			errorPrinter.Println("No runnable selected")
-			return
+		if nonInteractive && len(args) == 0 {
+			return fmt.Errorf("a runnable name is required in non-interactive mode")
 		}
-
+		name, err := chooseRunnable(cfg, args, "Select a runnable")
+		if err != nil {
+			return err
+		}
+		if dryRun {
+			actions := []string{}
+			if withPre {
+				actions = append(actions, fmt.Sprintf("Execute pre-runnable %s", cfg.PreRunnableFile))
+			}
+			actions = append(actions, fmt.Sprintf("Execute runnable %s from %s", name, cfg.DependenciesDir))
+			return writePlan(cmd, actions...)
+		}
 		if withPre {
-			res := runnables.RunPreRunnable(cfg)
-			if res.IsErr() {
-				errorPrinter.Println(res.Err())
-				return
+			if result := runnables.RunPreRunnable(cfg); result.IsErr() {
+				return result.Err()
 			}
 		}
-
-		res := runnables.RunRunnable(cfg, result)
-		if res.IsErr() {
-			errorPrinter.Println(res.Err())
-		}
+		return runnables.RunRunnable(cfg, name).Err()
 	},
 }
 
 var allCmd = &cobra.Command{
 	Use:   "all",
 	Short: "Run all runnables",
-	Long:  `Run all runnables`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg := config.Get().Must()
-		allRunnables := runnables.ListAllRunnablesAsStrings(cfg).Must()
-		filtered := utils.FilterStrings(allRunnables, filter)
-
-		for _, runnable := range filtered {
-			fmt.Println("* " + runnable)
-		}
-
-		prompt := promptui.Prompt{
-			Label:     "Are you sure you want to run the above runnables?",
-			IsConfirm: true,
-		}
-		res, err := prompt.Run()
+	Long:  "Run all runnables",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := commandConfig()
 		if err != nil {
-			errorPrinter.Println(err)
-			return
+			return err
 		}
-
-		if res == "" || res == "n" || res == "false" {
-			errorPrinter.Println("User declined to run runnables")
-			return
+		names, err := runnables.ListAllRunnablesAsStrings(cfg).Unwrap()
+		if err != nil {
+			return err
 		}
-
+		names = utils.WithoutStrings(utils.FilterStrings(names, filter), []string{"pre", "pre.sh"})
+		for _, name := range names {
+			fmt.Fprintln(cmd.OutOrStdout(), "* "+name)
+		}
+		if dryRun {
+			actions := make([]string, 0, len(names)+1)
+			if withPre {
+				actions = append(actions, fmt.Sprintf("Execute pre-runnable %s", cfg.PreRunnableFile))
+			}
+			for _, name := range names {
+				actions = append(actions, fmt.Sprintf("Execute runnable %s from %s", name, cfg.DependenciesDir))
+			}
+			if len(actions) == 0 {
+				actions = append(actions, "No runnable scripts match the request")
+			}
+			return writePlan(cmd, actions...)
+		}
+		if nonInteractive && !assumeYes {
+			return fmt.Errorf("--yes is required to run all dependencies in non-interactive mode")
+		}
+		if !assumeYes {
+			prompt := promptui.Prompt{Label: "Are you sure you want to run the above runnables?", IsConfirm: true}
+			answer, err := prompt.Run()
+			if err != nil {
+				return err
+			}
+			if answer == "" || answer == "n" || answer == "false" {
+				return fmt.Errorf("user declined to run runnables")
+			}
+		}
 		if withPre {
-			res := runnables.RunPreRunnable(cfg)
-			if res.IsErr() {
-				errorPrinter.Println(res.Err())
-				return
+			if result := runnables.RunPreRunnable(cfg); result.IsErr() {
+				return result.Err()
 			}
 		}
-
-		filteredWithoutPre := utils.WithoutStrings(filtered, []string{"pre", "pre.sh"})
-
-		for _, runnable := range filteredWithoutPre {
-			res := runnables.RunRunnable(cfg, runnable)
-			if res.IsErr() {
-				errorPrinter.Println(res.Err())
+		for _, name := range names {
+			if result := runnables.RunRunnable(cfg, name); result.IsErr() {
+				return result.Err()
 			}
 		}
+		return nil
 	},
 }
 
+func chooseRunnable(cfg config.Config, args []string, label string) (string, error) {
+	if len(args) == 1 {
+		return args[0], nil
+	}
+	options, err := runnables.ListAllRunnablesAsStrings(cfg).Unwrap()
+	if err != nil {
+		return "", err
+	}
+	prompt := promptui.Select{
+		Label:             label,
+		Items:             options,
+		StartInSearchMode: true,
+		Searcher: func(input string, index int) bool {
+			return strings.Contains(options[index], input)
+		},
+	}
+	_, name, err := prompt.Run()
+	if err != nil {
+		return "", err
+	}
+	if name == "" {
+		return "", fmt.Errorf("no runnable selected")
+	}
+	return name, nil
+}
+
 func init() {
+	addJSONFlag(dependenciesCmd)
+	addJSONFlag(listAsStringsCmd)
+	newCmd.Flags().BoolVar(&newNoEdit, "no-edit", false, "create the runnable without opening an editor")
 	allCmd.Flags().StringVarP(&filter, "filter", "f", "", "filter runnables")
 	allCmd.Flags().BoolVarP(&withPre, "with-pre", "p", false, "include the pre runnable")
-
-	dependenciesCmd.AddCommand(allCmd)
-
 	runnableCmd.Flags().BoolVarP(&withPre, "with-pre", "p", false, "include the pre runnable")
 
-	dependenciesCmd.AddCommand(runnableCmd)
-	dependenciesCmd.AddCommand(listAsStringsCmd)
-	dependenciesCmd.AddCommand(deleteCmd)
-	dependenciesCmd.AddCommand(newCmd)
-	dependenciesCmd.AddCommand(editCmd)
-
+	dependenciesCmd.AddCommand(allCmd, runnableCmd, listAsStringsCmd, deleteCmd, newCmd, editCmd)
 	rootCmd.AddCommand(dependenciesCmd)
 }

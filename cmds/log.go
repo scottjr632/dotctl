@@ -1,29 +1,20 @@
 package cmds
 
 import (
-	"github.com/fatih/color"
-	"github.com/scottjr632/dotctl/internal/config"
 	"github.com/scottjr632/dotctl/internal/git"
 	"github.com/spf13/cobra"
 )
 
 var logCmd = &cobra.Command{
 	Use:   "log",
-	Short: "Show git log",
-	Long:  `Show git log`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cfgResult := config.Get()
-		if cfgResult.IsErr() {
-			color.Red("Failed to get config: %v", cfgResult.UnwrapErr())
-			return
+	Short: "Show Git history",
+	Long:  "Show Git history",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := inspectionConfig()
+		if err != nil {
+			return err
 		}
-
-		cfg := cfgResult.Must()
-		logResult := git.GitCmd(cfg, "log", "--name-only").ExecuteInTerminal()
-		if logResult != nil {
-			color.Red("Failed to get git log: %v", logResult)
-			return
-		}
+		return git.GitCmd(cfg, append([]string{"log", "--name-only"}, args...)...).ExecuteInTerminal()
 	},
 }
 

@@ -2,7 +2,6 @@ package cmds
 
 import (
 	"github.com/fatih/color"
-	"github.com/scottjr632/dotctl/internal/config"
 	"github.com/scottjr632/dotctl/internal/git"
 	"github.com/spf13/cobra"
 )
@@ -16,27 +15,33 @@ var isTrackedCmd = &cobra.Command{
 		"it",
 	},
 	Short: "Check if a file is tracked in the dotfiles repository",
-	Long:  `Check if a file is tracked in the dotfiles repository`,
+	Long:  "Check if a file is tracked in the dotfiles repository",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		filePath := args[0]
-		cfgResult := config.Get()
-		if cfgResult.IsErr() {
-			errorPrinter.Println(cfgResult.UnwrapErr())
-			return
-		}
-
-		cfg := cfgResult.Must()
-		statusCmd := git.GitCmd(cfg, "ls-files", "--error-unmatch", filePath)
-		err := statusCmd.ExecuteInTerminal()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := inspectionConfig()
 		if err != nil {
-			color.Red("File '%s' is not tracked", filePath)
-		} else {
-			color.Green("File '%s' is tracked", filePath)
+			return err
 		}
+		tracked, err := git.IsTracked(cfg, args[0]).Unwrap()
+		if err != nil {
+			return err
+		}
+		if wantsJSON(cmd) {
+			return writeJSON(cmd, struct {
+				Path    string `json:"path"`
+				Tracked bool   `json:"tracked"`
+			}{Path: args[0], Tracked: tracked})
+		}
+		if tracked {
+			color.New(color.FgGreen).Fprintf(cmd.OutOrStdout(), "File %q is tracked\n", args[0])
+		} else {
+			color.New(color.FgRed).Fprintf(cmd.OutOrStdout(), "File %q is not tracked\n", args[0])
+		}
+		return nil
 	},
 }
 
 func init() {
+	addJSONFlag(isTrackedCmd)
 	rootCmd.AddCommand(isTrackedCmd)
 }

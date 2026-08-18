@@ -2,7 +2,7 @@ package cmds
 
 import (
 	"fmt"
-	"os"
+	"path/filepath"
 
 	"github.com/fatih/color"
 	"github.com/scottjr632/dotctl/internal/config"
@@ -13,58 +13,62 @@ import (
 
 var (
 	dotfileConfigPath string
-	repoUrl           string
+	repoURL           string
 
-	errorPrinter = color.New(color.FgRed, color.Bold)
-	logPrinter   = color.New(color.FgGreen, color.Italic)
-
-	defaultDotfileConfigPath = ".cfg/.dotfiles"
+	logPrinter = color.New(color.FgGreen, color.Italic)
 )
 
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize dotfile config",
-	Long:  `Initialize dotfile config`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if exist, err := config.DoesConfigFileExist(); err != nil {
-			errorPrinter.Println(err)
-		} else if exist {
-			errorPrinter.Println("config file already exists")
-			return
+	Long:  "Initialize dotfile config",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		exists, err := config.DoesConfigFileExist()
+		if err != nil {
+			return err
+		}
+		if exists {
+			return fmt.Errorf("config file already exists at %s", config.FilePath())
 		}
 
-		if repoUrl != "" {
-			gitCloneCmd := terminalcmd.New("git", "clone", "--bare", repoUrl, dotfileConfigPath)
-			if err := gitCloneCmd.ExecuteInTerminal(); err != nil {
-				errorPrinter.Println("Failed to clone dotfiles repo:", err)
-				return
+		path := dotfileConfigPath
+		if path == "" {
+			path = filepath.Join(git.WorkTree(), ".cfg", ".dotfiles")
+		}
+		if dryRun {
+			repositoryAction := fmt.Sprintf("Initialize a bare Git repository at %s", path)
+			if repoURL != "" {
+				repositoryAction = fmt.Sprintf("Clone %s as a bare Git repository at %s", repoURL, path)
 			}
-		} else {
-			if err := git.InitBareRepo(git.InitRepoOptions{Path: dotfileConfigPath}); err.IsErr() {
-				errorPrinter.Println(err.Err())
-				return
+			return writePlan(cmd,
+				repositoryAction,
+				fmt.Sprintf("Write dotctl configuration to %s", config.FilePath()),
+				fmt.Sprintf("Create the runnable directory under %s", config.DirPath()),
+			)
+		}
+		if repoURL != "" {
+			cloneCmd := terminalcmd.New("git", "clone", "--bare", repoURL, path)
+			if nonInteractive {
+				cloneCmd.WithEnv("GIT_TERMINAL_PROMPT=0")
 			}
+			if err := cloneCmd.ExecuteInTerminal(); err != nil {
+				return fmt.Errorf("clone dotfiles repository: %w", err)
+			}
+		} else if result := git.InitBareRepo(git.InitRepoOptions{Path: path}); result.IsErr() {
+			return result.Err()
 		}
 
-		if err := config.InitializeConfigFile(dotfileConfigPath); err.IsErr() {
-			errorPrinter.Println(err.Err())
-			return
+		if result := config.InitializeConfigFile(path); result.IsErr() {
+			return result.Err()
 		}
-
-		logPrinter.Println("Successfully initialized dotfile config")
+		logPrinter.Fprintln(cmd.OutOrStdout(), "Successfully initialized dotfile config")
+		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(initCmd)
-
-	homePath, err := os.UserHomeDir()
-	if err != nil {
-		errorPrinter.Println("Failed to get home directory:", err)
-	} else {
-		defaultDotfileConfigPath = fmt.Sprintf("%s/%s", homePath, defaultDotfileConfigPath)
-	}
-
-	initCmd.Flags().StringVarP(&dotfileConfigPath, "path", "p", defaultDotfileConfigPath, "config path to use for the git repo")
-	initCmd.Flags().StringVarP(&repoUrl, "clone", "c", "", "clone the dotfiles repo")
+	initCmd.Flags().StringVarP(&dotfileConfigPath, "path", "p", "", "path to use for the bare Git repository (default: WORK_TREE/.cfg/.dotfiles)")
+	initCmd.Flags().StringVarP(&repoURL, "clone", "c", "", "clone a bare repository from this URL")
 }

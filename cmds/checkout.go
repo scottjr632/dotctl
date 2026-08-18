@@ -1,62 +1,30 @@
 package cmds
 
 import (
-	"os"
-	"path/filepath"
+	"fmt"
 
-	"github.com/fatih/color"
-	"github.com/scottjr632/dotctl/internal/config"
 	"github.com/scottjr632/dotctl/internal/git"
 	"github.com/spf13/cobra"
 )
 
 var checkoutCmd = &cobra.Command{
 	Use:   "checkout",
-	Short: "Checkout a branch in the dotfiles repository",
-	Long:  `Checkout a branch in the dotfiles repository`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cfgResult := config.Get()
-		if cfgResult.IsErr() {
-			color.Red("Failed to get config: %v", cfgResult.UnwrapErr())
-			return
+	Short: "Check out tracked dotfiles into the work tree",
+	Long:  "Check out tracked dotfiles into the work tree",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := commandConfig()
+		if err != nil {
+			return err
 		}
-
-		cfg := cfgResult.Must()
-		checkoutCmd := git.GitCmd(cfg, "checkout")
-		if err := checkoutCmd.ExecuteInTerminal(); err != nil {
-			color.Red("Failed to checkout branch trying to create backup")
-			createBackup(cfg)
-			return
+		if dryRun {
+			return writePlan(cmd, fmt.Sprintf("Check out tracked files from %s into %s", cfg.DotfilesGitPath, git.WorkTree()))
 		}
+		if err := git.GitCmd(cfg, "checkout").ExecuteInTerminal(); err != nil {
+			return fmt.Errorf("checkout failed; resolve conflicting files before retrying: %w", err)
+		}
+		return nil
 	},
-}
-
-func createBackup(cfg config.Config) error {
-	backupDir, err := createBackupDir()
-	if err != nil {
-		return err
-	}
-
-	checkoutCmd := git.GitCmd(cfg, "checkout", "2>&1 | egrep \\\"s+\\.\" | awk {'print $1'} | xargs -I{} mv {} "+backupDir+"/{}")
-	checkoutCmd.ExecuteInTerminal()
-
-	return git.GitCmd(cfg, "checkout").ExecuteInTerminal()
-}
-
-func createBackupDir() (string, error) {
-	homePath, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	backupDir := filepath.Join(homePath, ".config-backup")
-	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(backupDir, 0o755); err != nil {
-			return "", err
-		}
-	}
-
-	return backupDir, nil
 }
 
 func init() {

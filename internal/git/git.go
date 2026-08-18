@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/scottjr632/dotctl/internal/config"
@@ -25,31 +27,61 @@ func IsNonEmptyDirError(err error) bool {
 	return ok
 }
 
+var (
+	workTreeOverride string
+	nonInteractive   bool
+)
+
 type InitRepoOptions struct {
 	Path string
 }
 
+type StatusInfo struct {
+	Branch      string   `json:"branch"`
+	Staged      []string `json:"staged"`
+	Modified    []string `json:"modified"`
+	Ahead       int      `json:"ahead"`
+	Behind      int      `json:"behind"`
+	HasUpstream bool     `json:"has_upstream"`
+}
+
+func SetWorkTree(path string) {
+	workTreeOverride = path
+}
+
+func SetNonInteractive(value bool) {
+	nonInteractive = value
+}
+
+func WorkTree() string {
+	if workTreeOverride != "" {
+		return workTreeOverride
+	}
+	if path := os.Getenv("DOTCTL_WORK_TREE"); path != "" {
+		return path
+	}
+	if path, err := os.UserHomeDir(); err == nil {
+		return path
+	}
+
+	slog.Warn("failed to get home directory; using the current directory as the work tree")
+	return "."
+}
+
 func initRepoDefaultOptions(options *InitRepoOptions) {
 	if options.Path == "" {
-		homePath, err := os.UserHomeDir()
-		if err != nil {
-			slog.Error("Failed to get home directory", "error", err)
-			options.Path = "./.cfg/.dotfiles" // fallback to relative path
-		} else {
-			options.Path = fmt.Sprintf("%s/.cfg/.dotfiles", homePath)
-		}
+		options.Path = filepath.Join(WorkTree(), ".cfg", ".dotfiles")
 	}
 }
 
 func GitCmd(cfg config.Config, args ...string) *terminalcmd.Cmd {
-	gitDir := fmt.Sprintf("--git-dir=%s", cfg.DotfilesGitPath)
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		slog.Error("Failed to get home directory", "error", err)
-		return nil
+	gitDir := "--git-dir=" + filepath.Clean(cfg.DotfilesGitPath)
+	cmdArgs := append([]string{gitDir, "--work-tree=" + filepath.Clean(WorkTree())}, args...)
+	cmd := terminalcmd.New("git", cmdArgs...)
+	if nonInteractive {
+		cmd.WithEnv("GIT_TERMINAL_PROMPT=0", "GIT_EDITOR=true")
 	}
-	cmdArgs := append([]string{gitDir, "--work-tree=" + homeDir}, args...)
-	return terminalcmd.New("git", cmdArgs...)
+	return cmd
 }
 
 func InitBareRepo(options InitRepoOptions) (res result.Failable) {
@@ -81,6 +113,72 @@ func InitBareRepo(options InitRepoOptions) (res result.Failable) {
 func Status(cfg config.Config) result.Failable {
 	cmd := GitCmd(cfg, "status")
 	return result.NewFailable(cmd.ExecuteInTerminal())
+}
+
+func GetStatus(cfg config.Config) result.Result[StatusInfo] {
+	branch, err := GitCmd(cfg, "branch", "--show-current").SilentlyExecute()
+	if err != nil {
+		return result.Err[StatusInfo](err)
+	}
+	staged, err := GitCmd(cfg, "diff", "--cached", "--name-only", "-z").SilentlyExecute()
+	if err != nil {
+		return result.Err[StatusInfo](err)
+	}
+	modified, err := GitCmd(cfg, "diff", "--name-only", "-z").SilentlyExecute()
+	if err != nil {
+		return result.Err[StatusInfo](err)
+	}
+
+	status := StatusInfo{
+		Branch:   strings.TrimSpace(branch),
+		Staged:   splitNullDelimited(staged),
+		Modified: splitNullDelimited(modified),
+	}
+	if _, err := GitCmd(cfg, "rev-parse", "--verify", "@{upstream}").SilentlyExecute(); err != nil {
+		return result.Ok(status)
+	}
+	counts, err := GitCmd(cfg, "rev-list", "--left-right", "--count", "@{upstream}...HEAD").SilentlyExecute()
+	if err != nil {
+		return result.Err[StatusInfo](err)
+	}
+
+	fields := strings.Fields(counts)
+	if len(fields) != 2 {
+		return result.Err[StatusInfo](fmt.Errorf("unexpected upstream counts: %q", strings.TrimSpace(counts)))
+	}
+	behind, behindErr := strconv.Atoi(fields[0])
+	ahead, aheadErr := strconv.Atoi(fields[1])
+	if behindErr != nil || aheadErr != nil {
+		return result.Err[StatusInfo](fmt.Errorf("unexpected upstream counts: %q", strings.TrimSpace(counts)))
+	}
+	status.Behind = behind
+	status.Ahead = ahead
+	status.HasUpstream = true
+	return result.Ok(status)
+}
+
+func ListTrackedFiles(cfg config.Config) result.Result[[]string] {
+	output, err := GitCmd(cfg, "ls-files", "-z").SilentlyExecute()
+	if err != nil {
+		return result.Err[[]string](err)
+	}
+	return result.Ok(splitNullDelimited(output))
+}
+
+func IsTracked(cfg config.Config, path string) result.Result[bool] {
+	output, err := GitCmd(cfg, "ls-files", "--", path).SilentlyExecute()
+	if err != nil {
+		return result.Err[bool](err)
+	}
+	return result.Ok(strings.TrimSpace(output) != "")
+}
+
+func splitNullDelimited(output string) []string {
+	output = strings.TrimSuffix(output, "\x00")
+	if output == "" {
+		return []string{}
+	}
+	return strings.Split(output, "\x00")
 }
 
 func AddFile(cfg config.Config, filePath string) result.Failable {
@@ -152,38 +250,4 @@ func GetRemoteURL(cfg config.Config) result.Result[string] {
 		return result.Err[string](err)
 	}
 	return result.Ok(strings.TrimSpace(string(output)))
-}
-
-func CheckForSync(cfg config.Config) result.Result[string] {
-	// Fetch the latest changes from the remote repository
-	fetchCmd := GitCmd(cfg, "fetch")
-	if _, err := fetchCmd.SilentlyExecute(); err != nil {
-		return result.Err[string](err)
-	}
-
-	// Check for differences between local and remote branches
-	statusCmd := GitCmd(cfg, "status", "-uno")
-	output, err := statusCmd.SilentlyExecute()
-	if err != nil {
-		return result.Err[string](err)
-	}
-
-	// Check for staged and modified files
-	diffCmd := GitCmd(cfg, "diff", "--name-only", "--cached")
-	diffOutput, err := diffCmd.SilentlyExecute()
-	if err != nil {
-		return result.Err[string](err)
-	}
-
-	if diffOutput != "" {
-		return result.Ok("There are staged and modified files that need to be committed.")
-	} else if strings.Contains(output, "Your branch is ahead of") {
-		return result.Ok("Local changes need to be pushed to the remote repository.")
-	} else if strings.Contains(output, "Your branch is behind") {
-		return result.Ok("Remote changes need to be pulled to the local repository.")
-	} else if strings.Contains(output, "have diverged") {
-		return result.Ok("Local and remote changes have diverged and need to be reconciled.")
-	} else {
-		return result.Ok("")
-	}
 }

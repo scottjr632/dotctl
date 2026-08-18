@@ -2,7 +2,6 @@ package cmds
 
 import (
 	"github.com/fatih/color"
-	"github.com/scottjr632/dotctl/internal/config"
 	"github.com/scottjr632/dotctl/internal/git"
 	"github.com/spf13/cobra"
 )
@@ -10,22 +9,21 @@ import (
 var pushCmd = &cobra.Command{
 	Use:   "push",
 	Short: "Push changes to the remote repository",
-	Long:  `Push changes to the remote repository`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cfgResult := config.Get()
-		if cfgResult.IsErr() {
-			color.Red("Failed to get config: %v", cfgResult.UnwrapErr())
-			return
+	Long:  "Push changes to the remote repository",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := commandConfig()
+		if err != nil {
+			return err
 		}
-
-		cfg := cfgResult.Must()
-		pushResult := git.Push(cfg)
-		if pushResult.IsErr() {
-			color.Red("Failed to push changes: %v", pushResult.Err())
-			return
+		if dryRun {
+			return writePlan(cmd, "Push local dotfile commits to the configured remote")
 		}
-
-		color.Green("Successfully pushed changes")
+		if result := git.Push(cfg); result.IsErr() {
+			return result.Err()
+		}
+		color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "Successfully pushed changes")
+		return nil
 	},
 }
 

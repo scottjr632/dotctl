@@ -1,39 +1,27 @@
 package cmds
 
 import (
-	"github.com/fatih/color"
-	"github.com/scottjr632/dotctl/internal/config"
+	"fmt"
+
 	"github.com/scottjr632/dotctl/internal/git"
 	"github.com/spf13/cobra"
 )
 
 var gitCmd = &cobra.Command{
-	Use:   "git [git-args]",
-	Short: "Pass through git commands to git",
-	Long:  `Pass through git commands to git`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) == 0 {
-			color.Red("No git command provided")
-			return
-		}
-
-		cfgResult := config.Get()
-		if cfgResult.IsErr() {
-			color.Red("Failed to get config: %v", cfgResult.UnwrapErr())
-			return
-		}
-
-		cfg := cfgResult.Must()
-		gitCmd := git.GitCmd(cfg, args...)
-		if gitCmd == nil {
-			color.Red("Failed to create git command")
-			return
-		}
-
-		err := gitCmd.ExecuteInTerminal()
+	Use:                "git [git-args]",
+	Short:              "Run Git against the dotfiles repository",
+	Long:               "Run Git against the dotfiles repository",
+	Args:               cobra.MinimumNArgs(1),
+	DisableFlagParsing: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := commandConfig()
 		if err != nil {
-			color.Red("Failed to execute git command: %v", err)
+			return err
 		}
+		if dryRun {
+			return writePlan(cmd, fmt.Sprintf("Run Git against the dotfiles repository with arguments %q", args))
+		}
+		return git.GitCmd(cfg, args...).ExecuteInTerminal()
 	},
 }
 

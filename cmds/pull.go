@@ -2,30 +2,28 @@ package cmds
 
 import (
 	"github.com/fatih/color"
-	"github.com/scottjr632/dotctl/internal/config"
 	"github.com/scottjr632/dotctl/internal/git"
 	"github.com/spf13/cobra"
 )
 
 var pullCmd = &cobra.Command{
 	Use:   "pull",
-	Short: "Fetch and pull the latest data from the repository",
-	Long:  `Fetch and pull the latest data from the repository`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cfgResult := config.Get()
-		if cfgResult.IsErr() {
-			color.Red("Failed to get config: %v", cfgResult.UnwrapErr())
-			return
-		}
-
-		cfg := cfgResult.Must()
-		err := git.GitCmd(cfg, "pull").ExecuteInTerminal()
+	Short: "Pull the latest data from the repository",
+	Long:  "Pull the latest data from the repository",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := commandConfig()
 		if err != nil {
-			color.Red("Failed to pull latest data: %v", err)
-			return
+			return err
 		}
-
-		color.Green("Successfully pulled the latest data")
+		if dryRun {
+			return writePlan(cmd, "Pull remote changes into the dotfiles repository")
+		}
+		if err := git.GitCmd(cfg, "pull").ExecuteInTerminal(); err != nil {
+			return err
+		}
+		color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "Successfully pulled the latest data")
+		return nil
 	},
 }
 

@@ -1,11 +1,11 @@
 package cmds
 
 import (
+	"fmt"
 	"os/exec"
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/scottjr632/dotctl/internal/config"
 	"github.com/scottjr632/dotctl/internal/git"
 	"github.com/spf13/cobra"
 )
@@ -15,39 +15,29 @@ var viewCmd = &cobra.Command{
 	Short:   "Open the git repository on GitHub",
 	Long:    `Open the git repository on GitHub in the default web browser`,
 	Aliases: []string{"gh", "open"},
-	Run: func(cmd *cobra.Command, args []string) {
-		cfgResult := config.Get()
-		if cfgResult.IsErr() {
-			color.Red("Failed to get config: %v", cfgResult.UnwrapErr())
-			return
-		}
-
-		cfg := cfgResult.Must()
-		remoteURLResult := git.GetRemoteURL(cfg)
-		if remoteURLResult.IsErr() {
-			color.Red("Failed to get remote URL: %v", remoteURLResult.UnwrapErr())
-			return
-		}
-
-		repoURL := remoteURLResult.Must()
-		if repoURL == "" {
-			color.Red("Remote URL is not set")
-			return
-		}
-
-		// Ensure the URL is a GitHub URL
-		if !strings.Contains(repoURL, "github.com") {
-			color.Red("The remote URL is not a GitHub URL")
-			return
-		}
-
-		err := exec.Command("open", repoURL).Start()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := commandConfig()
 		if err != nil {
-			color.Red("Failed to open the repository URL: %v", err)
-			return
+			return err
 		}
-
-		color.Green("Successfully opened the repository on GitHub")
+		repoURL, err := git.GetRemoteURL(cfg).Unwrap()
+		if err != nil {
+			return err
+		}
+		if repoURL == "" {
+			return fmt.Errorf("remote URL is not set")
+		}
+		if !strings.Contains(repoURL, "github.com") {
+			return fmt.Errorf("remote URL is not a GitHub URL")
+		}
+		if dryRun {
+			return writePlan(cmd, fmt.Sprintf("Open %s in the default browser", repoURL))
+		}
+		if err := exec.Command("open", repoURL).Start(); err != nil {
+			return fmt.Errorf("open repository URL: %w", err)
+		}
+		color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "Successfully opened the repository on GitHub")
+		return nil
 	},
 }
 

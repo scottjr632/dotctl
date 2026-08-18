@@ -1,32 +1,37 @@
 package cmds
 
 import (
-	"github.com/scottjr632/dotctl/internal/config"
+	"fmt"
+
 	"github.com/scottjr632/dotctl/internal/git"
 	"github.com/spf13/cobra"
 )
 
 var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all tracked files in the dotfiles repository",
-	Long:  `List all tracked files in the dotfiles repository`,
+	Use:     "list",
+	Short:   "List all tracked files in the dotfiles repository",
+	Long:    "List all tracked files in the dotfiles repository",
 	Aliases: []string{"ls"},
-	Run: func(cmd *cobra.Command, args []string) {
-		cfgResult := config.Get()
-		if cfgResult.IsErr() {
-			errorPrinter.Println(cfgResult.UnwrapErr())
-			return
-		}
-
-		cfg := cfgResult.Must()
-		err := git.GitCmd(cfg, "ls-files").ExecuteInTerminal()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := inspectionConfig()
 		if err != nil {
-			errorPrinter.Println(err)
-			return
+			return err
 		}
+		files, err := git.ListTrackedFiles(cfg).Unwrap()
+		if err != nil {
+			return err
+		}
+		if wantsJSON(cmd) {
+			return writeJSON(cmd, files)
+		}
+		for _, file := range files {
+			fmt.Fprintln(cmd.OutOrStdout(), file)
+		}
+		return nil
 	},
 }
 
 func init() {
+	addJSONFlag(listCmd)
 	rootCmd.AddCommand(listCmd)
 }

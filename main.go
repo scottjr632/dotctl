@@ -1,7 +1,13 @@
 package main
 
-import "github.com/scottjr632/dotctl/cmds"
+import (
+	"os"
+
+	"github.com/scottjr632/dotctl/cmds"
+)
 
 func main() {
-	cmds.Execute()
+	if err := cmds.Execute(); err != nil {
+		os.Exit(1)
+	}
 }

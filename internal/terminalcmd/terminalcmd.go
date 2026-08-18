@@ -1,9 +1,11 @@
 package terminalcmd
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/scottjr632/dotctl/internal/promise"
 )
@@ -23,9 +25,21 @@ func (c *Cmd) WithEnv(env ...string) *Cmd {
 	return c
 }
 
+func (c *Cmd) command() *exec.Cmd {
+	cmd := exec.Command(c.cmd, c.args...)
+	if len(c.env) > 0 {
+		cmd.Env = append(os.Environ(), c.env...)
+	}
+	return cmd
+}
+
 func (c *Cmd) SilentlyExecute() (output string, err error) {
-	out, err := exec.Command(c.cmd, c.args...).CombinedOutput()
-	return string(out), err
+	out, err := c.command().CombinedOutput()
+	output = string(out)
+	if err != nil && strings.TrimSpace(output) != "" {
+		return output, fmt.Errorf("%w: %s", err, strings.TrimSpace(output))
+	}
+	return output, err
 }
 
 func (c *Cmd) SilentlyExecuteAsync() (output string, err error) {
@@ -35,7 +49,7 @@ func (c *Cmd) SilentlyExecuteAsync() (output string, err error) {
 }
 
 func (c *Cmd) ExecuteToStdout() error {
-	cmd := exec.Command(c.cmd, c.args...)
+	cmd := c.command()
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -57,7 +71,7 @@ func (c *Cmd) ExecuteToStdout() error {
 }
 
 func (c *Cmd) ExecuteInTerminal() error {
-	cmd := exec.Command(c.cmd, c.args...)
+	cmd := c.command()
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

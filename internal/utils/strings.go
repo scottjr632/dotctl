@@ -16,23 +16,23 @@ func FilterStrings(arr []string, filter string) []string {
 	return filtered
 }
 
-func WithoutStrings(arr []string, filter []string) []string {
-	if len(filter) == 0 {
+func WithoutStrings(arr []string, excluded []string) []string {
+	if len(excluded) == 0 {
 		return arr
 	}
 
-	filtered := []string{}
-	for _, s := range arr {
-		shouldInclude := true
-		for _, f := range filter {
-			if s == f {
-				shouldInclude = false
+	filtered := make([]string, 0, len(arr))
+	for _, value := range arr {
+		include := true
+		for _, excludedValue := range excluded {
+			if value == excludedValue {
+				include = false
+				break
 			}
 		}
-		if shouldInclude {
-			filtered = append(filtered, s)
+		if include {
+			filtered = append(filtered, value)
 		}
-		return filtered
 	}
 	return filtered
 }

@@ -5,53 +5,19 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"path/filepath"
 
-	"github.com/fatih/color"
 	"github.com/scottjr632/dotctl/internal/result"
-	"github.com/scottjr632/dotctl/internal/terminalcmd"
 )
-
-type dirResult int
 
 const (
-	cfgFileName    = "config"
-	cfgFileDirName = "dotctl"
-
+	cfgFileName            = "config"
+	cfgFileDirName         = "dotctl"
 	defaultRunnableDirName = "runnables"
-
-	preRunnableFileName = "pre.sh"
-
-	dirExist dirResult = iota
-	dirDoesNotExist
-	fileExist
+	preRunnableFileName    = "pre.sh"
 )
 
-var (
-	cfgDirPath                 = getConfigDirPath()
-	cfgFilePath                = getConfigFilePath()
-	defaultCfgRunnableFilePath = getDefaultRunnableDirPath()
-)
-
-func getConfigDirPath() string {
-	homePath, err := os.UserHomeDir()
-	if err != nil {
-		slog.Error("Failed to get home directory", "error", err)
-		return ".config/" + cfgFileDirName
-	}
-	return homePath + "/.config/" + cfgFileDirName
-}
-
-func getConfigFilePath() string {
-	return getConfigDirPath() + "/" + cfgFileName
-}
-
-func getDefaultRunnableDirPath() string {
-	return getConfigDirPath() + "/" + defaultRunnableDirName
-}
-
-func getDefaultPreRunnableFilePath() string {
-	return getConfigDirPath() + "/" + defaultRunnableDirName + "/" + preRunnableFileName
-}
+var dirOverride string
 
 type Config struct {
 	DotfilesGitPath string `json:"git_repo_path"`
@@ -59,129 +25,157 @@ type Config struct {
 	PreRunnableFile string `json:"pre_runnable_file"`
 }
 
+func SetDir(path string) {
+	dirOverride = path
+}
+
+func DirPath() string {
+	if dirOverride != "" {
+		return dirOverride
+	}
+	if path := os.Getenv("DOTCTL_CONFIG_DIR"); path != "" {
+		return path
+	}
+	if path, err := os.UserConfigDir(); err == nil {
+		return filepath.Join(path, cfgFileDirName)
+	}
+
+	slog.Warn("failed to get user config directory; using a relative path")
+	return filepath.Join(".config", cfgFileDirName)
+}
+
+func FilePath() string {
+	return filepath.Join(DirPath(), cfgFileName)
+}
+
+func defaultRunnableDirPath() string {
+	return filepath.Join(DirPath(), defaultRunnableDirName)
+}
+
+func defaultPreRunnableFilePath() string {
+	return filepath.Join(defaultRunnableDirPath(), preRunnableFileName)
+}
+
 func allRequiredConfigsExist(cfg Config) bool {
 	return cfg.DotfilesGitPath != "" && cfg.DependenciesDir != "" && cfg.PreRunnableFile != ""
 }
 
-func updateMissingConfigs(currentCfg Config) result.Failable {
-	if allRequiredConfigsExist(currentCfg) {
+func withDefaults(cfg Config) Config {
+	if cfg.DependenciesDir == "" {
+		cfg.DependenciesDir = defaultRunnableDirPath()
+	}
+	if cfg.PreRunnableFile == "" {
+		cfg.PreRunnableFile = defaultPreRunnableFilePath()
+	}
+	return cfg
+}
+
+func updateMissingConfigs(cfg Config) result.Failable {
+	if allRequiredConfigsExist(cfg) {
 		return result.NewFailable(nil)
 	}
 
-	if currentCfg.DependenciesDir == "" {
-		currentCfg.DependenciesDir = getDefaultRunnableDirPath()
-		err := os.MkdirAll(currentCfg.DependenciesDir, 0755)
-		if err != nil {
+	missingDependenciesDir := cfg.DependenciesDir == ""
+	missingPreRunnable := cfg.PreRunnableFile == ""
+	cfg = withDefaults(cfg)
+
+	if missingDependenciesDir {
+		if err := os.MkdirAll(cfg.DependenciesDir, 0o755); err != nil {
 			return result.NewFailable(err)
 		}
 	}
 
-	if currentCfg.PreRunnableFile == "" {
-		currentCfg.PreRunnableFile = getDefaultPreRunnableFilePath()
-		file, err := os.Create(currentCfg.PreRunnableFile)
-		defer file.Close()
-		file.WriteString("#!/bin/sh\n")
-		if err != nil {
+	if missingPreRunnable {
+		if err := os.MkdirAll(filepath.Dir(cfg.PreRunnableFile), 0o755); err != nil {
 			return result.NewFailable(err)
 		}
-
-		if err = os.Chmod(currentCfg.PreRunnableFile, 0755); err != nil {
+		file, err := os.OpenFile(cfg.PreRunnableFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o755)
+		if err != nil && !errors.Is(err, os.ErrExist) {
 			return result.NewFailable(err)
+		}
+		if err == nil {
+			if _, writeErr := file.WriteString("#!/bin/sh\n"); writeErr != nil {
+				file.Close()
+				return result.NewFailable(writeErr)
+			}
+			if closeErr := file.Close(); closeErr != nil {
+				return result.NewFailable(closeErr)
+			}
 		}
 	}
 
-	configFile, err := os.OpenFile(cfgFilePath, os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return result.NewFailable(err)
-	}
-	defer configFile.Close()
-
-	encoder := json.NewEncoder(configFile)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(currentCfg); err != nil {
-		return result.NewFailable(err)
-	}
-
-	return result.NewFailable(nil)
+	return result.NewFailable(write(cfg))
 }
 
-func doesPathExist(path string) (dirResult, error) {
-	if info, err := os.Stat(path); err == nil {
-		if info.IsDir() {
-			return dirExist, nil
-		} else {
-			return fileExist, nil
-		}
-	} else if os.IsNotExist(err) {
-		return dirDoesNotExist, nil
-	} else {
-		return -1, err
+func write(cfg Config) error {
+	if err := os.MkdirAll(DirPath(), 0o755); err != nil {
+		return err
 	}
+	file, err := os.OpenFile(FilePath(), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(cfg)
 }
 
 func InitializeConfigFile(path string) result.Failable {
-	slog.Info("Initializing dotfile config", "path", cfgFilePath)
-	if dir, err := doesPathExist(cfgFilePath); err != nil {
-		return result.NewFailable(err)
-	} else if dir == dirDoesNotExist {
-		if err := os.MkdirAll(cfgDirPath, 0755); err != nil {
-			return result.NewFailable(err)
-		}
-	}
-
-	if dir, err := doesPathExist(cfgFilePath); err != nil {
-		return result.NewFailable(err)
-	} else if dir == fileExist {
-		return result.NewFailable(errors.New("file already exists"))
-	}
-
-	configFile, err := os.Create(cfgFilePath)
-	if err != nil {
-		return result.NewFailable(err)
-	}
-	defer configFile.Close()
-
-	newConfig := Config{DotfilesGitPath: path}
-
-	encoder := json.NewEncoder(configFile)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(newConfig); err != nil {
+	slog.Info("initializing dotfile config", "path", FilePath())
+	if _, err := os.Stat(FilePath()); err == nil {
+		return result.NewFailable(errors.New("config file already exists"))
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return result.NewFailable(err)
 	}
 
-	return result.NewFailable(nil)
+	return updateMissingConfigs(Config{DotfilesGitPath: path})
 }
 
 func DoesConfigFileExist() (bool, error) {
-	dirResult, err := doesPathExist(cfgFilePath)
-	return dirResult == fileExist, err
+	info, err := os.Stat(FilePath())
+	if err == nil {
+		return !info.IsDir(), nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
 }
 
-func PrintConfigFile() result.Failable {
-	color.Green("Printing config file: %s", cfgFilePath)
-	cat := terminalcmd.New("cat", cfgFilePath)
-	return result.NewFailable(cat.ExecuteInTerminal())
-}
+// Load reads the config without creating files or filling missing values.
+func Load() result.Result[Config] {
+	file, err := os.Open(FilePath())
+	if err != nil {
+		return result.Err[Config](err)
+	}
+	defer file.Close()
 
-func Get() result.Result[Config] {
 	var cfg Config
-
-	file, err := os.Open(cfgFilePath)
-	if err != nil {
+	if err := json.NewDecoder(file).Decode(&cfg); err != nil {
 		return result.Err[Config](err)
 	}
-	defer file.Close() // Ensure the file is closed after we're done
-
-	// Decode the JSON data into the struct
-	decoder := json.NewDecoder(file)
-	err = decoder.Decode(&cfg)
-	if err != nil {
-		return result.Err[Config](err)
-	}
-
-	if updateMissingConfigs(cfg).IsErr() {
-		return result.Err[Config](updateMissingConfigs(cfg).Err())
-	}
-
 	return result.Ok(cfg)
+}
+
+// Preview reads the effective config without creating or changing files.
+func Preview() result.Result[Config] {
+	cfg, err := Load().Unwrap()
+	if err != nil {
+		return result.Err[Config](err)
+	}
+	return result.Ok(withDefaults(cfg))
+}
+
+// Get reads the config and fills defaults used by older config files.
+func Get() result.Result[Config] {
+	cfg, err := Load().Unwrap()
+	if err != nil {
+		return result.Err[Config](err)
+	}
+	if updateResult := updateMissingConfigs(cfg); updateResult.IsErr() {
+		return result.Err[Config](updateResult.Err())
+	}
+	return Load()
 }

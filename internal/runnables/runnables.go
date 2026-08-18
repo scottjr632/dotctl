@@ -3,6 +3,7 @@ package runnables
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/manifoldco/promptui"
@@ -12,51 +13,47 @@ import (
 	"github.com/scottjr632/dotctl/internal/terminalcmd"
 )
 
-func CreateNewRunnable(cfg config.Config, name string) result.Failable {
-	filename := fmt.Sprintf("%s/%s.sh", cfg.DependenciesDir, name)
-
-	if _, err := os.Stat(filename); err == nil {
-		return EditRunnable(cfg, name)
-	} else if os.IsNotExist(err) {
-		file, err := os.Create(filename)
-		defer file.Close()
-
-		if err != nil {
-			return result.NewFailable(err)
-		}
-
-		if err = os.Chmod(filename, 0755); err != nil {
-			return result.NewFailable(err)
-		}
-
-		_, err = file.WriteString("#!/bin/sh\n")
-		if err != nil {
-			return result.NewFailable(err)
-		}
-	}
-
-	if addRes := git.AddFile(cfg, filename); addRes.IsErr() {
-		return result.NewFailable(addRes.Err())
-	}
-
-	return EditRunnable(cfg, name)
-
-}
-
-func ListAllRunnables(cfg config.Config) result.Failable {
-	files, err := os.ReadDir(cfg.DependenciesDir)
+func CreateRunnable(cfg config.Config, name string) result.Failable {
+	filename, err := runnablePath(cfg, name)
 	if err != nil {
 		return result.NewFailable(err)
 	}
-
-	if len(files) == 0 {
-		return result.NewFailable(fmt.Errorf("no runnables found"))
+	if _, err := os.Stat(filename); err == nil {
+		return result.NewFailable(fmt.Errorf("runnable %q already exists", name))
+	} else if !os.IsNotExist(err) {
+		return result.NewFailable(err)
 	}
-
-	for _, file := range files {
-		fmt.Println("* " + file.Name())
+	if err := os.MkdirAll(cfg.DependenciesDir, 0o755); err != nil {
+		return result.NewFailable(err)
 	}
-	return result.NewFailable(nil)
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o755)
+	if err != nil {
+		return result.NewFailable(err)
+	}
+	if _, err := file.WriteString("#!/bin/sh\n"); err != nil {
+		file.Close()
+		return result.NewFailable(err)
+	}
+	if err := file.Close(); err != nil {
+		return result.NewFailable(err)
+	}
+	return git.AddFile(cfg, filename)
+}
+
+func CreateNewRunnable(cfg config.Config, name string) result.Failable {
+	filename, err := runnablePath(cfg, name)
+	if err != nil {
+		return result.NewFailable(err)
+	}
+	if _, err := os.Stat(filename); err == nil {
+		return EditRunnable(cfg, name)
+	} else if !os.IsNotExist(err) {
+		return result.NewFailable(err)
+	}
+	if result := CreateRunnable(cfg, name); result.IsErr() {
+		return result
+	}
+	return EditRunnable(cfg, name)
 }
 
 func ListAllRunnablesAsStrings(cfg config.Config) result.Result[[]string] {
@@ -65,100 +62,92 @@ func ListAllRunnablesAsStrings(cfg config.Config) result.Result[[]string] {
 		return result.Err[[]string](err)
 	}
 
-	var runnables []string
+	names := make([]string, 0, len(files))
 	for _, file := range files {
-		runnables = append(runnables, file.Name())
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".sh") {
+			names = append(names, file.Name())
+		}
 	}
-
-	return result.Ok(runnables)
+	return result.Ok(names)
 }
 
 func EditRunnable(cfg config.Config, name string) result.Failable {
-	filename := fmt.Sprintf("%s/%s", cfg.DependenciesDir, name)
-	if !strings.HasSuffix(name, ".sh") {
-		filename = fmt.Sprintf("%s.sh", filename)
+	filename, err := runnablePath(cfg, name)
+	if err != nil {
+		return result.NewFailable(err)
 	}
-
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		if newRunnableErr := CreateNewRunnable(cfg, name); newRunnableErr.IsErr() {
-			return result.NewFailable(newRunnableErr.Err())
+		if result := CreateRunnable(cfg, name); result.IsErr() {
+			return result
 		}
+	} else if err != nil {
+		return result.NewFailable(err)
 	}
 
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
 		editor = "nvim"
 	}
-
-	err := terminalcmd.New(editor, filename).ExecuteInTerminal()
-	if err != nil {
-		return result.NewFailable(err)
-	}
-
-	return result.NewFailable(nil)
+	return result.NewFailable(terminalcmd.New(editor, filename).ExecuteInTerminal())
 }
 
-func DeleteRunnable(cfg config.Config, name string) result.Failable {
-	filename := fmt.Sprintf("%s/%s", cfg.DependenciesDir, name)
-
-	prompt := promptui.Prompt{
-		Label:     "Are you sure you want to delete this runnable " + name,
-		IsConfirm: true,
-	}
-
-	res, err := prompt.Run()
+func DeleteRunnable(cfg config.Config, name string, skipConfirmation bool) result.Failable {
+	filename, err := runnablePath(cfg, name)
 	if err != nil {
 		return result.NewFailable(err)
 	}
-
-	if res == "" || res == "n" || res == "false" {
-		return result.NewFailable(fmt.Errorf("user declined to delete runnable %s", name))
+	if !skipConfirmation {
+		prompt := promptui.Prompt{
+			Label:     "Are you sure you want to delete this runnable " + name,
+			IsConfirm: true,
+		}
+		answer, err := prompt.Run()
+		if err != nil {
+			return result.NewFailable(err)
+		}
+		if answer == "" || answer == "n" || answer == "false" {
+			return result.NewFailable(fmt.Errorf("user declined to delete runnable %s", name))
+		}
 	}
-
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		return result.NewFailable(fmt.Errorf("file %s does not exist", filename))
-	}
-
-	err = os.Remove(filename)
-	if err != nil {
+	if _, err := os.Stat(filename); err != nil {
+		if os.IsNotExist(err) {
+			return result.NewFailable(fmt.Errorf("file %s does not exist", filename))
+		}
 		return result.NewFailable(err)
 	}
-
-	return result.NewFailable(nil)
+	return result.NewFailable(os.Remove(filename))
 }
 
 func RunPreRunnable(cfg config.Config) result.Failable {
-	if _, err := os.Stat(cfg.PreRunnableFile); os.IsNotExist(err) {
-		return result.NewFailable(fmt.Errorf("file %s does not exist", cfg.PreRunnableFile))
-	}
-
-	err := terminalcmd.New(cfg.PreRunnableFile).ExecuteInTerminal()
-	if err != nil {
+	if _, err := os.Stat(cfg.PreRunnableFile); err != nil {
+		if os.IsNotExist(err) {
+			return result.NewFailable(fmt.Errorf("file %s does not exist", cfg.PreRunnableFile))
+		}
 		return result.NewFailable(err)
 	}
-
-	return result.NewFailable(nil)
-}
-
-func getNameWithSh(name string) string {
-	if strings.HasSuffix(name, ".sh") {
-		return name
-	}
-	return name + ".sh"
+	return result.NewFailable(terminalcmd.New(cfg.PreRunnableFile).ExecuteInTerminal())
 }
 
 func RunRunnable(cfg config.Config, name string) result.Failable {
-	nameWithSh := getNameWithSh(name)
-	filename := fmt.Sprintf("%s/%s", cfg.DependenciesDir, nameWithSh)
-
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		return result.NewFailable(fmt.Errorf("file %s does not exist", filename))
-	}
-
-	err := terminalcmd.New(filename).ExecuteInTerminal()
+	filename, err := runnablePath(cfg, name)
 	if err != nil {
 		return result.NewFailable(err)
 	}
+	if _, err := os.Stat(filename); err != nil {
+		if os.IsNotExist(err) {
+			return result.NewFailable(fmt.Errorf("file %s does not exist", filename))
+		}
+		return result.NewFailable(err)
+	}
+	return result.NewFailable(terminalcmd.New(filename).ExecuteInTerminal())
+}
 
-	return result.NewFailable(nil)
+func runnablePath(cfg config.Config, name string) (string, error) {
+	if name == "" || name == "." || name == ".." || filepath.Base(name) != name {
+		return "", fmt.Errorf("invalid runnable name %q", name)
+	}
+	if !strings.HasSuffix(name, ".sh") {
+		name += ".sh"
+	}
+	return filepath.Join(cfg.DependenciesDir, name), nil
 }
