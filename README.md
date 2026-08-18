@@ -50,19 +50,20 @@ Start with the local, read-only health check:
 dotctl doctor --json
 ```
 
-Use `--non-interactive` to make dotctl fail instead of opening an editor or prompt. Preview mutations with `--dry-run`, then run the same command without it:
+Use `--non-interactive` to make dotctl fail instead of opening an editor or prompt. `--json` enables non-interactive behavior automatically. Preview mutations with `--dry-run`, then run the same command without it:
 
 ```bash
-dotctl --non-interactive --dry-run track .zshrc --message "Track zsh config"
-dotctl --non-interactive track .zshrc --message "Track zsh config"
+dotctl --json --dry-run track .zshrc --message "Track zsh config"
+dotctl --json track .zshrc --message "Track zsh config"
 
-dotctl --non-interactive --dry-run update --message "Update managed dotfiles"
-dotctl --non-interactive update --message "Update managed dotfiles"
+dotctl --json --dry-run update --message "Update managed dotfiles"
+dotctl --json update --message "Update managed dotfiles"
 ```
 
-Commands that support structured inspection expose `--json`:
+`--json` is global and works with inspection, planning, mutation, help, and error output:
 
 ```bash
+dotctl --json --help
 dotctl doctor --json
 dotctl config show --json
 dotctl status --json
@@ -71,13 +72,19 @@ dotctl is-tracked .zshrc --json
 dotctl dependencies list --json
 ```
 
-Successful JSON output has a stable envelope:
+Every JSON invocation writes exactly one document to stdout. The `kind` is `result`, `plan`, or `error`:
 
 ```json
-{"ok":true,"data":{}}
+{"ok":true,"kind":"result","data":{}}
+{"ok":true,"kind":"plan","data":{"actions":[{"operation":"stage","description":"Stage .zshrc in the dotfiles repository"}]}}
+{"ok":false,"kind":"error","error":{"code":"CONFIG_NOT_FOUND","message":"dotctl config not found"}}
 ```
 
-Errors are written to stderr and return a nonzero exit status. Dotctl does not fetch from the network after unrelated commands; network access occurs only for explicit operations such as `init --clone`, `pull`, and `push`.
+JSON errors return a nonzero exit status and keep stderr empty. Git and runnable output is captured under `data.output` instead of being mixed with the JSON document. Stable error codes are `CONFIG_NOT_FOUND`, `CONFIG_INVALID`, `INVALID_ARGUMENT`, `PERMISSION_DENIED`, `EXTERNAL_COMMAND_FAILED`, `DOCTOR_UNHEALTHY`, `JSON_UNSUPPORTED`, and the fallback `COMMAND_FAILED`.
+
+Put global flags before `git` when using the passthrough command, for example `dotctl --json git status --short`.
+
+Dotctl does not fetch from the network after unrelated commands; network access occurs only for explicit operations such as `init --clone`, `pull`, and `push`.
 
 Use `--yes` with confirmed non-interactive operations, such as deleting or running all dependency scripts:
 

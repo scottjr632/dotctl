@@ -13,14 +13,15 @@ Use dotctl through the shell. Prefer its non-interactive and structured interfac
 1. Confirm the executable exists with `command -v dotctl`.
 2. Run `dotctl doctor --json`. This performs local checks without changing files or accessing the network.
 3. Inspect state with `dotctl status --json` and `dotctl list --json`.
-4. Before a mutation, run the exact command once with `--dry-run`.
-5. Execute only after the plan matches the user's request, then verify with `dotctl status --json`.
+4. Before a mutation, run the exact command once with `--json --dry-run`.
+5. Execute only after the structured plan matches the user's request, then verify with `dotctl status --json`.
 
 Do not add `--config-dir` or `--work-tree` when operating on the user's real dotfiles unless the user provided those paths. Those flags select a different dotctl environment.
 
 ## Read-only commands
 
 ```bash
+dotctl --json --help
 dotctl doctor --json
 dotctl config show --json
 dotctl status --json
@@ -29,19 +30,21 @@ dotctl is-tracked <path> --json
 dotctl dependencies list --json
 ```
 
-Successful JSON output uses `{"ok":true,"data":...}`. Treat a nonzero exit status as failure and read stderr. `is-tracked` returning `tracked: false` is a successful query, not a command failure.
+Each JSON invocation writes exactly one document to stdout with `kind` set to `result`, `plan`, or `error`. Errors use `{"ok":false,"kind":"error","error":{"code":"...","message":"..."}}` and return a nonzero exit status; stderr remains empty. Git and runnable output appears in `data.output`. `is-tracked` returning `tracked: false` is a successful query, not a command failure.
 
 ## Mutating dotfiles
 
-Always supply `--non-interactive` and a commit message for unattended commits:
+Use JSON mode and supply a commit message for unattended commits. JSON mode automatically disables prompts and editors:
 
 ```bash
-dotctl --non-interactive --dry-run track <path> --message "Track <path>"
-dotctl --non-interactive track <path> --message "Track <path>"
+dotctl --json --dry-run track <path> --message "Track <path>"
+dotctl --json track <path> --message "Track <path>"
 
-dotctl --non-interactive --dry-run update --message "Update managed dotfiles"
-dotctl --non-interactive update --message "Update managed dotfiles"
+dotctl --json --dry-run update --message "Update managed dotfiles"
+dotctl --json update --message "Update managed dotfiles"
 ```
+
+Put global flags before the `git` passthrough command so dotctl can parse them: `dotctl --json git status --short`.
 
 Use explicit `pull` and `push` commands for network synchronization. Ordinary inspection commands do not fetch.
 
@@ -51,14 +54,14 @@ Runnables are executable local scripts and may install packages or change the sy
 
 1. Use `dotctl config show --json` to locate `dependencies_dir`.
 2. Read the selected script.
-3. Run `dotctl --dry-run dependencies run <name>`.
+3. Run `dotctl --json --dry-run dependencies run <name>`.
 4. Execute it only when its contents and effects match the user's request.
 
 Never run `dependencies all` merely to explore what it does. For an explicitly requested unattended operation, use both `--non-interactive` and `--yes`:
 
 ```bash
-dotctl --non-interactive --dry-run dependencies all
-dotctl --non-interactive --yes dependencies all
+dotctl --json --dry-run dependencies all
+dotctl --json --yes dependencies all
 ```
 
 ## Safety rules
