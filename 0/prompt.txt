@@ -1,0 +1,46 @@
+<task>
+User: tell me about this repo
+
+Assistant: I'll take a look at the repo.
+# dotctl
+
+A personal **Go CLI for managing dotfiles via a bare Git repository** whose work tree is your home directory — the classic "bare repo + `--git-dir/--work-tree`" trick, wrapped in a friendly command surface. Yours: `github.com/scottjr632/dotctl`, ~3,400 lines, on `main`.
+
+## What it does
+
+- **Dotfile management**: `init` (optionally `--clone`), `checkout`, `track`, `update`, `status`, `list`, `is-tracked`, `pull`, `push`, `commit`, `branch`, `log`, plus a raw `git` passthrough.
+- **Runnables / dependencies**: executable shell scripts stored alongside the repo (`dotctl dependencies list|run|all|delete`) for bootstrapping a machine (e.g. a `brew` script).
+- **`doctor`**: read-only health check of config, repo, and git state.
+- **Agent integration**: embeds an Agent Skills–compatible `SKILL.md` (`internal/agentskill/`) that `dotctl agent install-skill` drops into `~/.agents/skills/dotctl/`.
+
+## Layout
+
+| Path | Role |
+|---|---|
+| `main.go` | 8 lines — delegates to `cmds.Execute()` |
+| `cmds/` | One Cobra command per file; `root.go` holds global flags, `output.go` the JSON writer |
+| `internal/git/` | Bare-repo git wrapper (largest file, 283 lines) |
+| `internal/config/` | Config at `~/.config/dotctl/config`; repo at `~/.cfg/.dotfiles` |
+| `internal/runnables/` | Dependency-script CRUD + execution |
+| `internal/result/`, `promise/` | Rust/JS-flavored generic helpers — `Result[T]`, `Failable`, goroutine-backed `Promise[T].Await()` |
+| `internal/terminalcmd/` | Subprocess execution with capture toggling |
+
+Deps are minimal: `cobra`, `promptui`, `fatih/color`. Go 1.21.5.
+
+## The interesting part: the automation contract
+
+Most of the recent commit history is about making this safe for scripts and agents. There's a deliberate, documented global contract:
+
+- `--json` emits **exactly one** document to stdout with `kind` of `result`, `plan`, or `error`, and implies `--non-interactive`. Stable error codes (`CONFIG_NOT_FOUND`, `DOCTOR_UNHEALTHY`, `EXTERNAL_COMMAND_FAILED`, …). Git output is captured under `data.output` rather than mixed into the stream. It even works for `--help`.
+- `--dry-run` produces a `plan` document you can diff against the real run.
+- `--config-dir` / `--work-tree` (or `DOTCTL_CONFIG_DIR` / `DOTCTL_WORK_TREE`) let an agent operate on a sandbox instead of `$HOME`.
+- `checkout --backup-existing` moves conflicting files to a timestamped backup dir, and is restricted to the *first* checkout so it can't clobber an established work tree.
+
+`cmds/json_contract_test.go` (180 lines) exists specifically to lock that contract down.
+
+## Tooling
+
+`Taskfile.yml` with `format`/`vet`/`test`/`build`/`install` (installs to `~/.local/bin`) and a `check` target mirrored exactly by `.github/workflows/ci.yml` — gofmt check, vet, test, build.
+
+Worth noting: recent commits ("Make initial dotfile checkout safe", "Preserve the existing dotctl config location on macOS") suggest the safety/portability work is fresh and possibly
+</task>
